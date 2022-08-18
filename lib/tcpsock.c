@@ -92,8 +92,7 @@ int tcp_active_open(tcpsock_t **sock, int remote_port, char *remote_ip) {
     tcpsock_t *client;
     int length, result;
     char *p;
-    TCP_ERR_HANDLER(((remote_port < MIN_PORT) || (remote_port > MAX_PORT)),
-                    return TCP_ADDRESS_ERROR);  // server port between 0 and MIN_PORT is allowed
+    TCP_ERR_HANDLER(((remote_port < MIN_PORT) || (remote_port > MAX_PORT)), return TCP_ADDRESS_ERROR);  // server port between 0 and MIN_PORT is allowed
     TCP_ERR_HANDLER(remote_ip == NULL, return TCP_ADDRESS_ERROR);
     client = tcp_sock_create();
     TCP_ERR_HANDLER(client == NULL, return TCP_MEMORY_ERROR);
