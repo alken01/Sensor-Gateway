@@ -5,12 +5,19 @@
 #ifndef _SBUFFER_H_
 #define _SBUFFER_H_
 
-#include <pthread.h>
 #include "config.h"
 
 #define SBUFFER_FAILURE -1
 #define SBUFFER_SUCCESS 0
 #define SBUFFER_NO_DATA 1
+
+// enum to differentiate between the datamgr and db reader threads
+typedef enum {
+    DATAMGR_THREAD, DB_THREAD
+} READ_TH_ENUM;
+
+// we use two threads
+#define READ_TH 2
 
 typedef struct sbuffer sbuffer_t;
 
@@ -35,7 +42,7 @@ int sbuffer_free(sbuffer_t** buffer);
  * \param data a pointer to pre-allocated sensor_data_t space, the data will be copied into this structure. No new memory is allocated for 'data' in this function.
  * \return SBUFFER_SUCCESS on success and SBUFFER_FAILURE if an error occurred
  */
-int sbuffer_remove(sbuffer_t* buffer, sensor_data_t* data);
+int sbuffer_remove(sbuffer_t* buffer, sensor_data_t* data, READ_TH_ENUM check);
 
 /**
  * Inserts the sensor data in 'data' at the end of 'buffer' (at the 'tail')

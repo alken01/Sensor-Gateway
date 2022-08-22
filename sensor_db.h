@@ -5,15 +5,9 @@
 #ifndef _SENSOR_DB_H_
 #define _SENSOR_DB_H_
 
-#include <stdio.h>
-#include <stdlib.h>
-#include "config.h"
 #include <sqlite3.h>
-
- // stringify preprocessor directives using 2-level preprocessor magic
- // this avoids using directives like -DDB_NAME=\"some_db_name\"
-#define REAL_TO_STRING(s) #s
-#define TO_STRING(s) REAL_TO_STRING(s)    //force macro-expansion on s before stringify s
+#include "config.h"
+#include "sbuffer.h"
 
 #ifndef DB_NAME
 #define DB_NAME Sensor.db
@@ -26,6 +20,13 @@
 #define DBCONN sqlite3
 
 typedef int (*callback_t)(void*, int, char**, char**);
+
+
+/**
+ * Initialize and synchronize sensor_db with other threads
+ * \param config_thread takes a thread
+ */
+void sensor_db_init(config_thread_t* config_thread);
 
 /**
  * Make a connection to the database server
@@ -58,6 +59,14 @@ int insert_sensor(DBCONN* conn, sensor_id_t id, sensor_value_t value, sensor_ts_
  * \return zero for success, and non-zero if an error occurs
  */
 int insert_sensor_from_file(DBCONN* conn, FILE* sensor_data);
+
+/**
+ * Write an INSERT query to insert all sensor measurements available in the file 'sensor_data'
+ * \param conn pointer to the current connection
+ * \param buffer a sbuffer pointer to a pointer to sbuffer
+ * \return zero for success, and non-zero if an error occurs
+ */
+int sensor_db_listen(DBCONN* conn, sbuffer_t** buffer);
 
 /**
   * Write a SELECT query to select all sensor measurements in the table
@@ -107,5 +116,15 @@ int find_sensor_by_timestamp(DBCONN* conn, sensor_ts_t ts, callback_t f);
  * \return zero for success, and non-zero if an error occurs
  */
 int find_sensor_after_timestamp(DBCONN* conn, sensor_ts_t ts, callback_t f);
+
+/**
+ * Write a query to be executed on the database
+ * The callback function is applied to every row in the result
+ * \param conn pointer to the current connection
+ * \param f function pointer to the callback method that will handle the result set
+ * \param sql the sql query to be executed
+ * \return zero for success, and non-zero if an error occurs
+ */
+int sql_query(DBCONN* conn, callback_t f, char* sql);
 
 #endif /* _SENSOR_DB_H_ */
