@@ -19,19 +19,19 @@ void log_event(char* log_event);
 int sql_query(DBCONN* conn, callback_t f, char* sql);
 
 // global variables
-pthread_cond_t* data_cond;
-pthread_mutex_t* datamgr_lock;
-int* data_mgr;
+static pthread_cond_t* data_cond;
+static pthread_mutex_t* datamgr_lock;
+static int* data_mgr;
 
-pthread_cond_t* db_cond;
-pthread_mutex_t* db_lock;
-int* data_sensor_db;
+static pthread_cond_t* db_cond;
+static pthread_mutex_t* db_lock;
+static int* data_sensor_db;
 
-pthread_rwlock_t* connmgr_lock;
-int* connmgr_working;
+static pthread_rwlock_t* connmgr_lock;
+static int* connmgr_working;
 
-pthread_mutex_t* fifo_mutex;
-int* fifo_fd;
+static pthread_mutex_t* fifo_mutex;
+static int* fifo_fd;
 
 void sensor_db_init(config_thread_t* config_thread){
     data_cond = config_thread->data_cond;

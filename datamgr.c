@@ -1,6 +1,8 @@
 /**
  * \author Alken Rrokaj
  */
+#define _GNU_SOURCE
+
 #include <stdlib.h>
 #include <stdio.h>
 #include "config.h"
@@ -34,19 +36,19 @@ int data_compare(void* x, void* y);
 // global variables
 static dplist_t* sensor_list;
 
-pthread_cond_t* data_cond;
-pthread_mutex_t* datamgr_lock;
-int* data_mgr;
+static pthread_cond_t* data_cond;
+static pthread_mutex_t* datamgr_lock;
+static int* data_mgr;
 
-pthread_cond_t* db_cond;
-pthread_mutex_t* db_lock;
-int* data_sensor_db;
+static pthread_cond_t* db_cond;
+static pthread_mutex_t* db_lock;
+static int* data_sensor_db;
 
-pthread_rwlock_t* connmgr_lock;
-int* connmgr_working;
+static pthread_rwlock_t* connmgr_lock;
+static int* connmgr_working;
 
-pthread_mutex_t* fifo_mutex;
-int* fifo_fd;
+static pthread_mutex_t* fifo_mutex;
+static int* fifo_fd;
 
 void datamgr_init(config_thread_t* config_thread){
     data_cond = config_thread->data_cond;
