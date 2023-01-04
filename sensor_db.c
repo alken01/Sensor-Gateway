@@ -57,10 +57,8 @@ DBCONN* init_connection(char clear_up_flag){
         sqlite3_close(db);
         log_event("UNABLE TO CONNECT TO SQL SERVER.");
 #ifdef DEBUG
-        printf(BLUE_CLR);
-        printf("DB: CANNOT OPEN DATABASE.\n");
-        printf("DB: UNABLE TO CONNECT TO SQL SERVER.\n");
-        printf(OFF_CLR);
+        printf(BLUE_CLR "DB: CANNOT OPEN DATABASE.\n
+                DB: UNABLE TO CONNECT TO SQL SERVER.\n" OFF_CLR);
 #endif
         return NULL;
     }
@@ -85,10 +83,7 @@ DBCONN* init_connection(char clear_up_flag){
     log_event(sql);
 
 #ifdef DEBUG
-    printf(BLUE_CLR);
-    printf("DB: ESTABLISHED SQL SERVER CONNECTION.\n");
-    printf("%s\n", sql);
-    printf(OFF_CLR);
+    printf(BLUE_CLR "DB: ESTABLISHED SQL SERVER CONNECTION.\n%s\n"OFF_CLR, sql);
 #endif
     sqlite3_free(sql);
     return db;
@@ -98,9 +93,7 @@ DBCONN* init_connection(char clear_up_flag){
 void disconnect(DBCONN* conn){
     sqlite3_close(conn);
 #ifdef DEBUG
-    printf(BLUE_CLR);
-    printf("DB: DISCONNECTED FROM DATABASE\n");
-    printf(OFF_CLR);
+    printf(BLUE_CLR"DB: DISCONNECTED FROM DATABASE\n" OFF_CLR);
 #endif
 }
 
@@ -112,9 +105,7 @@ int sensor_db_listen(DBCONN* conn, sbuffer_t** buffer){
         while(data_sensor_db <= 0){
             pthread_cond_wait(db_cond, db_lock);
 #ifdef DEBUG
-            printf(BLUE_CLR);
-            printf("DB: WAITING FOR DATA.\n");
-            printf(OFF_CLR);
+            printf(BLUE_CLR "DB: WAITING FOR DATA.\n" OFF_CLR);
 #endif
         }
         pthread_mutex_unlock(db_lock);
@@ -144,9 +135,9 @@ int insert_sensor(DBCONN* conn, sensor_id_t id, sensor_value_t value, sensor_ts_
 
 int insert_sensor_from_file(DBCONN* conn, FILE* sensor_data){
     while(!feof(sensor_data)){
-        sensor_id_t buffer_id[1];           //2 bytes
-        sensor_value_t buffer_val[1];       //8 bytes
-        sensor_ts_t buffer_ts[1];           //8 bytes
+        sensor_id_t buffer_id[1];   
+        sensor_value_t buffer_val[1];
+        sensor_ts_t buffer_ts[1];
 
         if(fread(buffer_id, sizeof(buffer_id), 1, sensor_data) == 0) return 0;
         fread(buffer_val, sizeof(buffer_val), 1, sensor_data);
@@ -201,17 +192,13 @@ int sql_query(DBCONN* conn, callback_t f, char* sql){
         sqlite3_close(conn);
         log_event("CONNECTION TO SQL SERVER LOST.");
 #ifdef DEBUG
-        printf(BLUE_CLR);
-        printf("DB: CONNECTION TO SQL SERVER LOST.\n");
-        printf(OFF_CLR);
+        printf(BLUE_CLR "DB: CONNECTION TO SQL SERVER LOST.\n" OFF_CLR);
 #endif
         return -1;
     }
     sqlite3_free(sql);
 #ifdef DEBUG
-    printf(BLUE_CLR);
-    printf("DB: EXECUTED \n%s\n\n", sql);
-    printf(OFF_CLR);
+    printf(BLUE_CLR "DB: EXECUTED \n%s\n\n" OFF_CLR, sql); 
 #endif
     return 0;
 }
