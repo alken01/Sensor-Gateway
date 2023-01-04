@@ -186,7 +186,13 @@ void connmgr_listen(int port_number, sbuffer_t** buffer){
 
 					// let the other threads know there is data to read
 					pthread_mutex_lock(datamgr_lock);
+					#ifdef DEBUG
+					printf(CYAN_CLR "190: datamgr_lock before:%d\n"OFF_CLR, &data_mgr);
+					#endif
 					data_mgr++;
+					#ifdef DEBUG
+					printf(CYAN_CLR "190: datamgr_lock after:%d\n"OFF_CLR, data_mgr);
+					#endif
 					pthread_mutex_unlock(datamgr_lock);
 
 					pthread_mutex_lock(db_lock);
@@ -235,18 +241,12 @@ void connmgr_listen(int port_number, sbuffer_t** buffer){
 				while_loop = 0;
 				break;
 			}
-
-
 		}
 	}
 	pthread_rwlock_wrlock(connmgr_lock);
 	*connmgr_working = 0;
 	pthread_rwlock_unlock(connmgr_lock);
 
-	log_event("CLOSED CONNECTION MANAGER:", port_number);
-	tcp_close(&(poll_server.socket_id));
-	connmgr_free();
-	fclose(fp_sensor_data_text);
 #ifdef DEBUG
 	printf(PURPLE_CLR "CLOSING CONNMGR.\n" OFF_CLR);
 #endif
