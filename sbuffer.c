@@ -10,7 +10,7 @@
 #include "config.h"
 
 #define READ 1
-#define UNREAD 2
+#define UNREAD 0
  // basic node for the buffer, these nodes are linked together to create the buffer
 typedef struct sbuffer_node {
     struct sbuffer_node* next;      // a pointer to the next node
@@ -99,6 +99,7 @@ int sbuffer_remove(sbuffer_t* buffer, sensor_data_t* data, READ_TH_ENUM check){
     else
         buffer->head = buffer->head->next;
     free(dummy);
+
     // unlock sbuffer
     pthread_rwlock_unlock(buffer->rwlock);
     return SBUFFER_SUCCESS;

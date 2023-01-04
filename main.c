@@ -47,6 +47,7 @@ int* fifo_fd;
 sbuffer_t* buffer;
 
 int main(int argc, char* argv[]){
+    printf("start");
     // check if port_number arguments passed
     if(argv[1] == NULL) return print_help();
 

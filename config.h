@@ -62,7 +62,7 @@ typedef struct{
 
 // structure to hold sensor_data
 typedef struct {
-    sensor_id_t id;         /** < sensor id */
+    sensor_id_t id;         /** < sensorkk id */
     sensor_value_t value;   /** < sensor value */
     sensor_ts_t ts;         /** < sensor timestamp */
 } sensor_data_t;
