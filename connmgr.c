@@ -190,7 +190,7 @@ void connmgr_listen(int port_number, sbuffer_t** buffer){
 					printf("reading datamgr_lock");
 					printf("190: datamgr_lock before:%d\n", *data_mgr);
 					#endif
-					data_mgr++;
+					(*data_mgr)++;
 					#ifdef DEBUG
 					printf("190: datamgr_lock after:%d\n", *data_mgr);
 					#endif
