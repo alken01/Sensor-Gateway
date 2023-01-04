@@ -116,9 +116,7 @@ void connmgr_listen(int port_number, sbuffer_t** buffer){
 				if(index == 0){
 					// get socket
 #ifdef DEBUG
-					printf(PURPLE_CLR);
-					printf("CONNMGR: NEW CONNECTION DETECTED.\n");
-					printf(OFF_CLR);
+					printf(PURPLE_CLR "CONNMGR: NEW CONNECTION DETECTED.\n" OFF_CLR);
 #endif
 					tcpsock_t* new_socket;
 					pollfd_t new_fd;
@@ -159,13 +157,13 @@ void connmgr_listen(int port_number, sbuffer_t** buffer){
 					// update the ID and log_event if this is the first data from this sensor
 					if(poll_at_index->sensor_id != sensor_data.id){
 						//check if it is a duplicate sensor
-						if(!dpl_check_unique(dpl_connections, &sensor_data.id)){
-							log_event("NON-UNIQUE SERVER OPENED ID:", sensor_data.id);
-							tcp_close(&(poll_at_index->socket_id));
-							dpl_connections = dpl_remove_at_index(dpl_connections, index, true);
-							list_size = dpl_size(dpl_connections);
-							break;
-						}
+						// if(!dpl_check_unique(dpl_connections, &sensor_data.id)){
+						// 	log_event("NON-UNIQUE SERVER OPENED ID:", sensor_data.id);
+						// 	tcp_close(&(poll_at_index->socket_id));
+						// 	dpl_connections = dpl_remove_at_index(dpl_connections, index, true);
+						// 	list_size = dpl_size(dpl_connections);
+						// 	break;
+						// }
 						// update the sensor ID and log the event
 						poll_at_index->sensor_id = sensor_data.id;
 						log_event("NEW CONNECTION SENSOR ID:", poll_at_index->sensor_id);
@@ -173,6 +171,10 @@ void connmgr_listen(int port_number, sbuffer_t** buffer){
 						printf(PURPLE_CLR "NEW CONNECTION SENSOR ID: %d\n"OFF_CLR, poll_at_index->sensor_id );
 #endif
 					}
+
+					//update the poll_at_index time
+					poll_at_index->last_modified = time(NULL);
+					
 					//add it in the buffer
 					sensor_data_t insert_data = {
 						.id = sensor_data.id,
@@ -211,7 +213,7 @@ void connmgr_listen(int port_number, sbuffer_t** buffer){
 			// 			printf("TIMEOUT IN: %ld\n", TIMEOUT + poll_at_index->last_modified - time(NULL));
 			// #endif
 
-			// if the sensor at index has not sent data in TIMEOUT seconds or it has sent a POLLHUP
+			// if the sensor at index has not sent data in TIMEOUT seconds or it has sent a POLLHUP signal,
 			// close that connecion and remove it from the list
 			if(((poll_at_index->last_modified + TIMEOUT) < time(NULL) && index > 0) || poll_at_index->file_d.revents > 1){
 				printf(PURPLE_CLR "CLOSED CONNECTION SENSOR ID:%d\n"OFF_CLR, poll_at_index->sensor_id);
@@ -222,9 +224,19 @@ void connmgr_listen(int port_number, sbuffer_t** buffer){
 				list_size = dpl_size(dpl_connections);
 			}
 
-		}
-		if(list_size == 1 && (poll_server.last_modified + TIMEOUT) < time(NULL)){
-			break;
+			// If there are no sensors in the list and TIMEOUT number of seconds have passed, 
+			// close the files and stop the connmgr_listen function.
+			if(list_size == 1 && (poll_server.last_modified + TIMEOUT) < time(NULL)){
+				tcp_close(&(poll_at_index->socket_id));
+				log_event("CLOSED CONNECTION MANAGER:", port_number);
+				tcp_close(&(poll_server.socket_id));
+				connmgr_free();
+				fclose(fp_sensor_data_text);
+				while_loop = 0;
+				break;
+			}
+
+
 		}
 	}
 	pthread_rwlock_wrlock(connmgr_lock);
