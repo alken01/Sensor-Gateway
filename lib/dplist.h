@@ -206,7 +206,7 @@ dplist_t *dpl_insert_at_reference(dplist_t *list, void *element, dplist_node_t *
  * \param insert_copy if true use element_copy() to make a copy of 'element' and use the copy in the new list node, otherwise the given element pointer is added to the list
  * \return a pointer to the list or NULL
  */
-dplist_t *dpl_insert_sorted(dplist_t *list, void *element, bool insert_copy);
+// dplist_t *dpl_insert_sorted(dplist_t *list, void *element, bool insert_copy);
 
 /** Removes the list node with reference 'reference' in the list.
  * - The list node itself should always be freed.
@@ -230,6 +230,6 @@ dplist_t *dpl_remove_at_reference(dplist_t *list, dplist_node_t *reference, bool
  */
 dplist_t *dpl_remove_element(dplist_t *list, void *element, bool free_element);
 
-// ---- you can add your extra operators here ----//
+
 
 #endif  // _DPLIST_H_

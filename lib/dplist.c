@@ -46,7 +46,6 @@ struct dplist_node {
 
 struct dplist {
     dplist_node_t *head;
-
     void *(*element_copy)(void *src_element);
     void (*element_free)(void **element);
     int (*element_compare)(void *x, void *y);
@@ -82,8 +81,17 @@ void dpl_free(dplist_t **list, bool free_element) {
     *list = NULL;
 }
 
-dplist_t *dpl_insert_at_index(dplist_t *list, void *element, int index, bool insert_copy) {
 
+int dpl_size(dplist_t *list) {
+    if(list == NULL) return -1;
+    if (list->head == NULL) return 0;
+    int i;
+    dplist_node_t *current = list->head;
+    for(i=0; current != NULL; i++, current = current->next);
+    return i;
+}
+
+dplist_t *dpl_insert_at_index(dplist_t *list, void *element, int index, bool insert_copy) {
     dplist_node_t *ref_at_index, *list_node;
     if (list == NULL) return NULL;
 
@@ -167,17 +175,6 @@ dplist_t *dpl_remove_at_index(dplist_t *list, int index, bool free_element) {
     return list;
 }
 
-int dpl_size(dplist_t *list) {
-    if(list == NULL) return -1;
-    if (list->head == NULL) return 0;
-
-    int i;
-    dplist_node_t *current = list->head;
-    for(i=0; current != NULL; i++, current = current->next);
-    return i;
-
-}
-
 void *dpl_get_element_at_index(dplist_t *list, int index) {
     //If 'list' is NULL, 0 is returned.
     //If the list is empty, 0 is returned.
@@ -242,17 +239,17 @@ void *dpl_get_element_at_reference(dplist_t *list, dplist_node_t *reference) {
 
 
 //*** HERE STARTS THE EXTRA SET OF OPERATORS ***//
-
-
 dplist_node_t *dpl_get_first_reference(dplist_t *list){
     return dpl_get_reference_at_index(list, 0);
 }
-
 
 dplist_node_t *dpl_get_last_reference(dplist_t *list){
     return dpl_get_reference_at_index(list, dpl_size(list));
 }
 
+int dpl_get_index_of_reference(dplist_t *list, dplist_node_t *reference){
+    return dpl_get_index_of_element(list, dpl_get_element_at_reference(list, reference));
+}
 
 dplist_node_t *dpl_get_next_reference(dplist_t *list, dplist_node_t *reference){
     return dpl_get_reference_at_index(list, dpl_get_index_of_reference(list, reference)+1);
@@ -262,16 +259,9 @@ dplist_node_t *dpl_get_previous_reference(dplist_t *list, dplist_node_t *referen
     return dpl_get_reference_at_index(list, dpl_get_index_of_reference(list, reference)-1);
 }
 
-
 dplist_node_t *dpl_get_reference_of_element(dplist_t *list, void *element){
     return dpl_get_reference_at_index(list, dpl_get_index_of_element(list, element));
 }
-
-
-int dpl_get_index_of_reference(dplist_t *list, dplist_node_t *reference){
-    return dpl_get_index_of_element(list, dpl_get_element_at_reference(list, reference));
-}
-
 
 dplist_t *dpl_insert_at_reference(dplist_t *list, void *element, dplist_node_t *reference, bool insert_copy){
     return dpl_insert_at_index(list, element, dpl_get_index_of_reference(list, reference), insert_copy);
@@ -299,5 +289,3 @@ dplist_t *dpl_remove_at_reference(dplist_t *list, dplist_node_t *reference, bool
 dplist_t *dpl_remove_element(dplist_t *list, void *element, bool free_element){
     return dpl_remove_at_index(list,  dpl_get_index_of_element(list, element), free_element);
 }
-
-

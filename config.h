@@ -12,6 +12,7 @@
 #include <poll.h>
 #include "lib/dplist.h"
 #include "lib/tcpsock.h"
+#include <stdbool.h>
 
 #ifdef DEBUG
 #define OFF_CLR     "\033[0m"
@@ -25,6 +26,10 @@
 #define WHITE_CLR   "\033[0;37m"
 #endif
 
+
+#ifndef RUN_AVG_LENGTH
+#define RUN_AVG_LENGTH 5
+#endif
  /*
   * Use ERROR_HANDLER() for handling memory allocation problems, invalid sensor IDs, non-existing files, etc.
   */
@@ -44,13 +49,15 @@ typedef time_t sensor_ts_t;
 typedef struct pollfd pollfd_t;
 
 // structure to hold sensors
-typedef struct {
+typedef struct{
     sensor_id_t sensor_id;
     room_id_t room_id;
     sensor_value_t running_avg;
     sensor_ts_t last_modified;
-    dplist_t* sensor_data;
-} sensor_t;
+    sensor_value_t data_buffer[RUN_AVG_LENGTH]; //circular buffer to hold the variables
+    bool take_avg;
+    uint16_t buffer_position;
+}sensor_t; //element t in the dplist
 
 // structure to hold sensor_data
 typedef struct {

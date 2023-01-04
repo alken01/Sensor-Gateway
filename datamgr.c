@@ -8,19 +8,24 @@
 #include "lib/dplist.h"
 #include "datamgr.h"
 
- /*
-  * definition of error codes
-  */
+// definition of error codes
 #define DPLIST_NO_ERROR 0
 #define DPLIST_MEMORY_ERROR 1 // error due to mem alloc failure
 #define DPLIST_INVALID_ERROR 2 //error due to a list operation applied on a NULL list 
+#define ERROR_NULL_POINTER 3
 
-  // used in log_event
+// used in log_event
 typedef enum {
     COLD, HOT, ERROR
 } DATAMGR_CASE;
 
+// global variables
+static dplist_t* sensor_list;
+
+// helper methods
 static void log_event(sensor_id_t id, sensor_value_t temp, DATAMGR_CASE check);
+void read_sensor_map(FILE* fp_sensor_map);
+void add_sensor_data(sensor_data_t* new_data);
 
 // methods for dpl_create
 void sensor_free(void** element);
@@ -31,9 +36,7 @@ void data_free(void** element);
 void* data_copy(void* element);
 int data_compare(void* x, void* y);
 
-// global variables
-static dplist_t* sensor_list;
-
+// thread variables
 pthread_cond_t* data_cond;
 pthread_mutex_t* datamgr_lock;
 int* data_mgr;
@@ -65,109 +68,119 @@ void datamgr_init(config_thread_t* config_thread){
 }
 
 void datamgr_parse_sensor_files(FILE* fp_sensor_map, sbuffer_t** sbuffer){
-    //maybe give out an error TODO??
-    if(fp_sensor_map == NULL) return;
-
+    // initialize the sensor_list
     sensor_list = dpl_create(sensor_copy, sensor_free, sensor_compare);
 
-    // read fist the sesnor_map
-    while(!feof(fp_sensor_map)){
-        // copy each line in str unless empty (returns NULL)
-        char str[8];
-        if(fgets(str, 8, fp_sensor_map) == NULL) continue;
+    // read the sensor_map file
+    read_sensor_map(fp_sensor_map);
 
-        int j, i = 0;
-        char sensor_id[8];
-        char room_id[8];
-        bool found = false;
-        // parse each line
-        while(str[i] != '\0'){
-            //when space is found
-            if(str[i] == ' '){ room_id[i] = '\0'; found = true; j = i; }
-            //before the space we add the chars to room_id
-            if(!found) room_id[i] = str[i];
-            //after the space we add the chars to sensor_id
-            else sensor_id[i - j] = str[i];
-            i++;
-        }
-
-        // copy the parsed data in a sensor
-        sensor_t sens = {
-            .room_id = atoi(room_id),  .sensor_id = atoi(sensor_id),
-            .running_avg = 0.0,     .last_modified = 0
-        };
-
-        sensor_list = dpl_insert_at_index(sensor_list, &sens, 0, true);
-#ifdef DEBUG
-        printf(GREEN_CLR);
-        printf("DATAMGR: NEW SENSOR ID: %d  ROOM ID: %d\n", sens.sensor_id, sens.room_id);
-        printf(OFF_CLR);
-#endif
-    }
-    // we know have initalized dplist with the room and id
-
-    // now we parse sensor_data, and insert each sensor_data_t to the appropriate sensor_t element in sensor_list
-    while(*connmgr_working != 0){
+    // parse sensor_data, and insert it to the appropriate sensor
+    while(*connmgr_working == 1){
         pthread_mutex_lock(datamgr_lock);
         while(data_mgr <= 0){
-#ifdef DEBUG
-            printf(GREEN_CLR);
-            printf("DATAMGR: WAITING FOR DATA.\n");
-            printf(OFF_CLR);
-#endif
+        #ifdef DEBUG
+            printf(GREEN_CLR); printf("DATAMGR: WAITING FOR DATA.\n"); printf(OFF_CLR);
+        #endif
             pthread_cond_wait(data_cond, datamgr_lock);
         }
-        // create a sensor_data variable and copy the data at the head of the buffer in the variable
+
+        // create a sensor_data
         sensor_data_t new_data;
+
+        // copy the data at the head of the buffer
         sbuffer_remove(*sbuffer, &new_data, DATAMGR_THREAD);
 
         // adding empty ts
-        if(new_data.ts == 0) continue;
-        // find the sensor in the list where sensor_id = buffer_id
-        // add it to the element
-        for(int i = 0; i < dpl_size(sensor_list);i++){
-            sensor_t* sns = dpl_get_element_at_index(sensor_list, i);
-            if(sns->sensor_id == new_data.id){
-                // create a dplist if first data value
-                if(sns->sensor_data == NULL)
-                    sns->sensor_data = dpl_create(data_copy, data_free, data_compare);
-                //add the new data point
-                sns->sensor_data = dpl_insert_at_index(sns->sensor_data, &new_data, 0, true);
-                //update the timestamp
-                sns->last_modified = new_data.ts;
+        if(new_data.ts == 0) continue; // TODO:is this needed??
+        
+        //add the sensor_data to the sensor_list
+        add_sensor_data(&new_data);
 
-                //update the running average
-                //if less than RUN_AVG_LENGTH, should be 0
-                if(dpl_size(sns->sensor_data) < RUN_AVG_LENGTH)
-                    sns->running_avg = 0.0;
-                else{
-                    sensor_value_t avg = 0.0;
-                    for(int i = 0; i < RUN_AVG_LENGTH; i++)
-                        avg = avg + ((sensor_data_t*) dpl_get_element_at_index(sns->sensor_data, i))->value;
-                    sns->running_avg = (avg / RUN_AVG_LENGTH);
-
-                    // log in case it is an extreme
-                    if(sns->running_avg > SET_MAX_TEMP) log_event(sns->sensor_id, sns->running_avg, HOT);
-                    if(sns->running_avg < SET_MIN_TEMP) log_event(sns->sensor_id, sns->running_avg, COLD);
-#ifdef DEBUG
-                    printf(GREEN_CLR);
-                    printf("data_connmgr: %d\n", *data_mgr);
-                    printf("CONNMGR: ID: %u ROOM: %d  AVG: %f   NR: %d   TIME: %ld\n",
-                        sns->sensor_id, sns->room_id, sns->running_avg, dpl_size(sns->sensor_data), sns->last_modified);
-                    printf(OFF_CLR);
-#endif
-                }
-            }
-        }
         data_mgr--;
         pthread_mutex_unlock(datamgr_lock);
     }
 }
 
+void read_sensor_map(FILE* fp_sensor_map){
+    if(fp_sensor_map == NULL){
+        fprintf(stderr, "Error: NULL pointer fp_sensor_map\n");
+        exit(ERROR_NULL_POINTER);
+    }
+
+    //add the room_id and sensor_id to the sensor_list
+    while(!feof(fp_sensor_map)){
+        //read each line in str unless empty/NULL 
+        char str[8];
+        if(fgets(str, 8, fp_sensor_map) == NULL) continue;
+
+        //parse the room_id and sensor_id
+        sensor_id_t s_id;
+        room_id_t r_id;
+        sscanf(str, "%hu %hu", &r_id, &s_id);
+
+        // initialize the sensor
+        sensor_t sens = {
+            .room_id = r_id,  .sensor_id = s_id,
+            .running_avg = 0.0,     .last_modified = 0,
+            .buffer_position = 0,   .take_avg = false
+        };
+#ifdef DEBUG
+        printf(GREEN_CLR); printf("DATAMGR: NEW SENSOR ID: %d  ROOM ID: %d\n", sens.sensor_id, sens.room_id); printf(OFF_CLR);
+#endif
+        //add the sensor_t to the sensor_list
+        sensor_list = dpl_insert_at_index(sensor_list, &sens, 0, true);
+    }
+}
+
+void add_sensor_data(sensor_data_t* new_data){
+    //find element in list where sensor_id = buffer_id and add the element
+    for(int i = 0; i < dpl_size(sensor_list);i++){
+        sensor_t* sns = dpl_get_element_at_index(sensor_list, i);
+
+        // if the sensor_id is not the same, continue
+        if(sns->sensor_id != new_data->id) continue;
+
+        //add the new data point in the circular buffer
+        sns->data_buffer[sns->buffer_position] = new_data->value;
+
+        //update buffer pointer position
+        sns->buffer_position++;
+
+        //act as a circular buffer
+        if(sns->buffer_position == RUN_AVG_LENGTH){
+            sns->buffer_position = 0;
+            sns->take_avg = true; //if the buffer is full, start taking the average
+        }
+
+        //update the timestamp
+        sns->last_modified = new_data->ts;
+
+        //if the buffer is not full we don't take the average
+        if(sns->take_avg == false) continue;
+
+        //update the running average
+        sensor_value_t avg = 0;
+
+        // calculate sum of all elements in the buffer
+        for(int i = 0; i < RUN_AVG_LENGTH; i++) avg = avg + sns->data_buffer[i];
+
+        // calculate the average
+        sns->running_avg = (avg / RUN_AVG_LENGTH);
+
+        // log in case it is an extreme
+        if(sns->running_avg > SET_MAX_TEMP) log_event(sns->sensor_id, sns->running_avg, HOT);
+        if(sns->running_avg < SET_MIN_TEMP) log_event(sns->sensor_id, sns->running_avg, COLD);
+#ifdef DEBUG
+        printf(GREEN_CLR);
+        printf("data_connmgr: %d\n", *data_mgr);
+        printf("CONNMGR: ID: %u ROOM: %d  AVG: %f   TIME: %ld\n",
+            sns->sensor_id, sns->room_id, sns->running_avg, sns->last_modified);
+        printf(OFF_CLR);
+#endif
+    }
+}
 
 void datamgr_free(){
-    for(int i = 0; i < dpl_size(sensor_list); i++)
-        dpl_free(&((sensor_t*) dpl_get_element_at_index(sensor_list, i))->sensor_data, true);
     dpl_free(&sensor_list, true);
 }
 
@@ -206,8 +219,6 @@ int datamgr_get_total_sensors(){
 
 // helper methods
 void sensor_free(void** element){
-    free(((sensor_t*) (*element))->sensor_data);
-    ((sensor_t*) (*element))->sensor_data = NULL;
     free(*element);
     *element = NULL;
 }
