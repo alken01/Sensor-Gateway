@@ -81,7 +81,7 @@ void datamgr_parse_sensor_files(FILE* fp_sensor_map, sbuffer_t** sbuffer){
     // parse sensor_data, and insert it to the appropriate sensor
     while(*connmgr_working == 1){
         pthread_mutex_lock(datamgr_lock);
-        while(data_mgr <= 0){
+        while(&data_mgr <= 0){
         #ifdef DEBUG
             printf(GREEN_CLR); printf("DATAMGR: WAITING FOR DATA.\n"); printf(OFF_CLR);
         #endif
