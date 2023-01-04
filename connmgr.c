@@ -187,11 +187,11 @@ void connmgr_listen(int port_number, sbuffer_t** buffer){
 					// let the other threads know there is data to read
 					pthread_mutex_lock(datamgr_lock);
 					#ifdef DEBUG
-					printf(CYAN_CLR "190: datamgr_lock before:%d\n"OFF_CLR, &data_mgr);
+					printf("190: datamgr_lock before:%d\n", *data_mgr);
 					#endif
 					data_mgr++;
 					#ifdef DEBUG
-					printf(CYAN_CLR "190: datamgr_lock after:%d\n"OFF_CLR, data_mgr);
+					printf("190: datamgr_lock after:%d\n", *data_mgr);
 					#endif
 					pthread_mutex_unlock(datamgr_lock);
 
