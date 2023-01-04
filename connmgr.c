@@ -138,9 +138,7 @@ void connmgr_listen(int port_number, sbuffer_t** buffer){
 					// insert the sensor in the list
 					dpl_connections = dpl_insert_at_index(dpl_connections, &insert_sensor, dpl_size(dpl_connections), true);
 #ifdef DEBUG
-					printf(PURPLE_CLR);
-					printf("CONNMGR: NEW CONNECTION INCOMING.\n");
-					printf(OFF_CLR);
+					printf(PURPLE_CLR printf("CONNMGR: NEW CONNECTION INCOMING.\n" OFF_CLR);
 #endif
 				} else{
 					// create a sensor_data
@@ -156,9 +154,7 @@ void connmgr_listen(int port_number, sbuffer_t** buffer){
 					tcp_receive(poll_at_index->socket_id, &sensor_data.value, &sdt);
 					tcp_receive(poll_at_index->socket_id, &sensor_data.ts, &stt);
 #ifdef DEBUG
-					printf(PURPLE_CLR);
-					printf("CONNMGR: NEW DATA RECEIVED.\n");
-					printf(OFF_CLR);
+					printf(PURPLE_CLR "CONNMGR: NEW DATA RECEIVED.\n" OFF_CLR);
 #endif
 					// update the ID and log_event if this is the first data from this sensor
 					if(poll_at_index->sensor_id != sensor_data.id){
@@ -174,9 +170,7 @@ void connmgr_listen(int port_number, sbuffer_t** buffer){
 						poll_at_index->sensor_id = sensor_data.id;
 						log_event("NEW CONNECTION SENSOR ID:", poll_at_index->sensor_id);
 #ifdef DEBUG
-						printf(PURPLE_CLR);
-						printf("NEW CONNECTION SENSOR ID: %d\n", poll_at_index->sensor_id);
-						printf(OFF_CLR);
+						printf(PURPLE_CLR "NEW CONNECTION SENSOR ID: %d\n", poll_at_index->sensor_id OFF_CLR);
 #endif
 					}
 					//add it in the buffer
@@ -217,8 +211,8 @@ void connmgr_listen(int port_number, sbuffer_t** buffer){
 			// 			printf("TIMEOUT IN: %ld\n", TIMEOUT + poll_at_index->last_modified - time(NULL));
 			// #endif
 
-						// if the sensor at index has not sent data in TIMEOUT seconds or it has sent a POLLHUP
-						// close that connecion and remove it from the list
+			// if the sensor at index has not sent data in TIMEOUT seconds or it has sent a POLLHUP
+			// close that connecion and remove it from the list
 			if(((poll_at_index->last_modified + TIMEOUT) < time(NULL) && index > 0) || poll_at_index->file_d.revents > 1){
 				printf(PURPLE_CLR "CLOSED CONNECTION SENSOR ID:%d\n"OFF_CLR, poll_at_index->sensor_id);
 				log_event("CLOSED CONNECTION SENSOR ID:", poll_at_index->sensor_id);
