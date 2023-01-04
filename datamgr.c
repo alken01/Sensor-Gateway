@@ -34,10 +34,6 @@ void sensor_free(void** element);
 void* sensor_copy(void* element);
 int sensor_compare(void* x, void* y);
 
-void data_free(void** element);
-void* data_copy(void* element);
-int data_compare(void* x, void* y);
-
 // global variables
 static dplist_t* sensor_list;
 
@@ -178,11 +174,8 @@ void add_sensor_data(sensor_data_t* new_data){
         if(sns->running_avg > SET_MAX_TEMP) log_event(sns->sensor_id, sns->running_avg, HOT);
         if(sns->running_avg < SET_MIN_TEMP) log_event(sns->sensor_id, sns->running_avg, COLD);
 #ifdef DEBUG
-        printf(GREEN_CLR);
-        printf("data_connmgr: %d\n", *data_mgr);
-        printf("CONNMGR: ID: %u ROOM: %d  AVG: %f   TIME: %ld\n",
-            sns->sensor_id, sns->room_id, sns->running_avg, sns->last_modified);
-        printf(OFF_CLR);
+        printf(GREEN_CLR "CONNMGR: ID: %u ROOM: %d  AVG: %f   TIME: %ld\n" OFF_CLR,
+                sns->sensor_id, sns->room_id, sns->running_avg, sns->last_modified);
 #endif
     }
 }
@@ -247,39 +240,16 @@ int sensor_compare(void* x, void* y){
     else return -1;
 }
 
-void data_free(void** element){
-    free(*element);
-    *element = NULL;
-}
-
-void* data_copy(void* element){
-    sensor_data_t* data = (sensor_data_t*) element;
-    sensor_data_t* copy = malloc(sizeof(sensor_data_t));
-    copy->value = data->value;
-    copy->ts = data->ts;
-    return (void*) copy;
-}
-
-int data_compare(void* x, void* y){
-    sensor_data_t* data_x = (sensor_data_t*) y;
-    sensor_data_t* data_y = (sensor_data_t*) x;
-    if(data_y->value == data_x->value) return 0;
-    if(data_y->value < data_x->value) return 1;
-    if(data_y->value > data_x->value) return -1;
-    else return -1;
-}
-
-
 // log event
 static void log_event(sensor_id_t id, sensor_value_t temp, DATAMGR_CASE check){
     FILE* fp_log = fopen("gateway.log", "a");
     switch(check){
     case COLD:
-        fprintf(fp_log, "\nSEQ_NR: xxx  TIME: %ld\nSENSOR ID: %d TOO HOT! (AVG_TEMP = %f)\n", time(NULL), id, temp);
+        fprintf(fp_log, "\nSEQ_NR: %d  TIME: %ld\nSENSOR ID: %d TOO HOT! (AVG_TEMP = %f)\n", COLD, time(NULL), id, temp);
     case HOT:
-        fprintf(fp_log, "\nSEQ_NR: xxx  TIME: %ld\nSENSOR ID: %d TOO HOT! (AVG_TEMP = %f)\n", time(NULL), id, temp);
+        fprintf(fp_log, "\nSEQ_NR: %d  TIME: %ld\nSENSOR ID: %d TOO HOT! (AVG_TEMP = %f)\n", HOT, time(NULL), id, temp);
     case ERROR:
-        fprintf(fp_log, "\nSEQ_NR: xxx  TIME: %ld\nSENSOR DATA FROM INVALID SENSOR ID: %d\n", time(NULL), id);
+        fprintf(fp_log, "\nSEQ_NR: %d  TIME: %ld\nSENSOR DATA FROM INVALID SENSOR ID: %d\n", ERROR, time(NULL), id);
     }
     fclose(fp_log);
 }

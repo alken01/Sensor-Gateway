@@ -101,7 +101,7 @@ int sensor_db_listen(DBCONN* conn, sbuffer_t** buffer){
 
     while(*connmgr_working != 0){
         pthread_mutex_lock(db_lock);
-        while(data_sensor_db <= 0){
+        while(*data_sensor_db <= 0){
             pthread_cond_wait(db_cond, db_lock);
 #ifdef DEBUG
             printf(BLUE_CLR "DB: WAITING FOR DATA.\n" OFF_CLR);
