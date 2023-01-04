@@ -17,3 +17,5 @@ lib/*.o
 *.log
 *.FIFO
 #add any other files or filetypes you do not want to appear in your repo in this file
+.idea/misc.xml
+.idea/vcs.xml

@@ -57,8 +57,7 @@ DBCONN* init_connection(char clear_up_flag){
         sqlite3_close(db);
         log_event("UNABLE TO CONNECT TO SQL SERVER.");
 #ifdef DEBUG
-        printf(BLUE_CLR "DB: CANNOT OPEN DATABASE.\n
-                DB: UNABLE TO CONNECT TO SQL SERVER.\n" OFF_CLR);
+        printf(BLUE_CLR "DB: CANNOT OPEN DATABASE.\n DB: UNABLE TO CONNECT TO SQL SERVER.\n" OFF_CLR);
 #endif
         return NULL;
     }

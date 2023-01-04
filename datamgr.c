@@ -220,8 +220,6 @@ int datamgr_get_total_sensors(){
     return dpl_size(sensor_list);
 }
 
-
-// helper methods
 void sensor_free(void** element){
     free(*element);
     *element = NULL;

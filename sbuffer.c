@@ -10,7 +10,7 @@
 #include "config.h"
 
 #define READ 1
-#define UNREAD 1
+#define UNREAD 2
  // basic node for the buffer, these nodes are linked together to create the buffer
 typedef struct sbuffer_node {
     struct sbuffer_node* next;      // a pointer to the next node

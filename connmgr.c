@@ -236,7 +236,7 @@ void connmgr_listen(int port_number, sbuffer_t** buffer){
 			break;
 		}
 }
-	pthread_rwlock_wrlock(connmgr_lock);
+    pthread_rwlock_wrlock(connmgr_lock);
 	*connmgr_working = 0;
 	pthread_rwlock_unlock(connmgr_lock);
 
@@ -293,7 +293,6 @@ int dpl_check_unique(dplist_t* list, sensor_id_t* data_id){
 	for(int i = 0; i < dpl_size(list); i++)
 		if(element_compare(data_id, dpl_get_element_at_index(list, i)) == 0)
 			return false;
-
 	return true;
 }
 
