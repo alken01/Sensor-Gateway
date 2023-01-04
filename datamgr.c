@@ -174,13 +174,13 @@ void add_sensor_data(sensor_data_t* new_data){
         // log in case it is an extreme
         if(sns->running_avg > SET_MAX_TEMP) log_event(sns->sensor_id, sns->running_avg, HOT);
         if(sns->running_avg < SET_MIN_TEMP) log_event(sns->sensor_id, sns->running_avg, COLD);
-#ifdef DEBUG
-        printf(GREEN_CLR);
-        printf("data_connmgr: %d\n", *data_mgr);
-        printf("CONNMGR: ID: %u ROOM: %d  AVG: %f   TIME: %ld\n",
-            sns->sensor_id, sns->room_id, sns->running_avg, sns->last_modified);
-        printf(OFF_CLR);
-#endif
+// #ifdef DEBUG
+//         printf(GREEN_CLR);
+//         printf("data_connmgr: %d\n", *data_mgr);
+//         printf("CONNMGR: ID: %u ROOM: %d  AVG: %f   TIME: %ld\n",
+//             sns->sensor_id, sns->room_id, sns->running_avg, sns->last_modified);
+//         printf(OFF_CLR);
+// #endif
     }
 }
 
