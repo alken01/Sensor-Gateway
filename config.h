@@ -4,6 +4,7 @@
 
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
+#define _GNU_SOURCE
 
 #include <stdint.h>
 #include <time.h>

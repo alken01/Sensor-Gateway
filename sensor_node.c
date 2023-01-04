@@ -1,6 +1,7 @@
 /**
  * \author Luc Vandeurzen
  */
+#define _GNU_SOURCE 
 
 #include <stdio.h>
 #include <string.h>
