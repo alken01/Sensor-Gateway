@@ -138,7 +138,7 @@ void connmgr_listen(int port_number, sbuffer_t** buffer){
 					// insert the sensor in the list
 					dpl_connections = dpl_insert_at_index(dpl_connections, &insert_sensor, dpl_size(dpl_connections), true);
 #ifdef DEBUG
-					printf(PURPLE_CLR printf("CONNMGR: NEW CONNECTION INCOMING.\n" OFF_CLR);
+					printf(PURPLE_CLR "CONNMGR: NEW CONNECTION INCOMING.\n" OFF_CLR);
 #endif
 				} else{
 					// create a sensor_data
@@ -170,7 +170,7 @@ void connmgr_listen(int port_number, sbuffer_t** buffer){
 						poll_at_index->sensor_id = sensor_data.id;
 						log_event("NEW CONNECTION SENSOR ID:", poll_at_index->sensor_id);
 #ifdef DEBUG
-						printf(PURPLE_CLR "NEW CONNECTION SENSOR ID: %d\n", poll_at_index->sensor_id OFF_CLR);
+						printf(PURPLE_CLR "NEW CONNECTION SENSOR ID: %d\n"OFF_CLR, poll_at_index->sensor_id );
 #endif
 					}
 					//add it in the buffer
