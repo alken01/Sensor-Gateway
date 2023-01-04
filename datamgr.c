@@ -83,10 +83,13 @@ void datamgr_parse_sensor_files(FILE* fp_sensor_map, sbuffer_t** sbuffer){
         pthread_mutex_lock(datamgr_lock);
         while(*data_mgr <= 0){
         #ifdef DEBUG
-            printf(GREEN_CLR); printf("DATAMGR: WAITING FOR DATA.\n"); printf(OFF_CLR);
+            printf(GREEN_CLR "DATAMGR: WAITING FOR DATA.\n" OFF_CLR);
         #endif
             pthread_cond_wait(data_cond, datamgr_lock);
         }
+        #ifdef DEBUG
+            printf(GREEN_CLR "DATAMGR: GOT DATA.\n" OFF_CLR);
+        #endif
 
         // create a sensor_data
         sensor_data_t new_data;
