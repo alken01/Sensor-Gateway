@@ -76,7 +76,7 @@ void datamgr_parse_sensor_files(FILE* fp_sensor_map, sbuffer_t** sbuffer){
 
     // parse sensor_data, and insert it to the appropriate sensor
     while(*connmgr_working){
-        pthread_mutex_lock(datamgr_lock);
+        // pthread_mutex_lock(datamgr_lock);
         while((*data_mgr) <= 0){
             pthread_cond_wait(data_cond, datamgr_lock);
         #ifdef DEBUG
@@ -89,13 +89,11 @@ void datamgr_parse_sensor_files(FILE* fp_sensor_map, sbuffer_t** sbuffer){
         sensor_data_t new_data;
 
         // copy the data at the head of the buffer
-        sbuffer_remove(*sbuffer, &new_data, DATAMGR_THREAD);
-
-        // adding empty ts
-        if(new_data.ts == 0) continue; // TODO:is this needed??
+        if(sbuffer_remove(*sbuffer, &new_data, DATAMGR_THREAD) != SBUFFER_SUCCESS) break;
         
         //add the sensor_data to the sensor_list
         add_sensor_data(&new_data);
+        
         pthread_mutex_lock(datamgr_lock);
         (*data_mgr)--;
         pthread_mutex_unlock(datamgr_lock);
@@ -157,7 +155,13 @@ void add_sensor_data(sensor_data_t* new_data){
         sns->last_modified = new_data->ts;
 
         //if the buffer is not full we don't take the average
-        if(sns->take_avg == false) continue;
+        if(sns->take_avg == false){
+#ifdef DEBUG
+            printf(GREEN_CLR "DATAMGR: ID: %u ROOM: %d  AVG: %f   TIME: %ld\n" OFF_CLR,
+                sns->sensor_id, sns->room_id, sns->running_avg, sns->last_modified);
+#endif
+            continue;
+        }
 
         //update the running average
         sensor_value_t avg = 0;

@@ -97,25 +97,22 @@ void disconnect(DBCONN* conn){
 }
 
 int sensor_db_listen(DBCONN* conn, sbuffer_t** buffer){
-    // pthread_rwlock_rdlock(connmgr_active_lock);
-
     while(*connmgr_working == 1){
         pthread_mutex_lock(db_lock);
         while((*data_sensor_db) <= 0){
             pthread_cond_wait(db_cond, db_lock);
-#ifdef DEBUG
+        #ifdef DEBUG
             printf(BLUE_CLR "DB: WAITING FOR DATA.\n" OFF_CLR);
-#endif
+        #endif
         }
         pthread_mutex_unlock(db_lock);
 
         // copy the data
-        sensor_data_t data;
-        if(sbuffer_remove(*buffer, &data, DB_THREAD) != SBUFFER_SUCCESS)
-            break;
+        sensor_data_t new_data;
+        if(sbuffer_remove(*buffer, &new_data, DB_THREAD) != SBUFFER_SUCCESS) break;
 
         // insert the sensor in the database
-        if(insert_sensor(conn, data.id, data.value, data.ts) != 0)
+        if(insert_sensor(conn, new_data.id, new_data.value, new_data.ts) != 0)
             return -1;
 
         pthread_mutex_lock(db_lock);
@@ -195,9 +192,9 @@ int sql_query(DBCONN* conn, callback_t f, char* sql){
 #endif
         return -1;
     }
-    sqlite3_free(sql);
 #ifdef DEBUG
     printf(BLUE_CLR "DB: %s\n" OFF_CLR, sql); 
 #endif
+    sqlite3_free(sql);
     return 0;
 }
