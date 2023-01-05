@@ -99,9 +99,9 @@ void disconnect(DBCONN* conn){
 int sensor_db_listen(DBCONN* conn, sbuffer_t** buffer){
     // pthread_rwlock_rdlock(connmgr_active_lock);
 
-    while(*connmgr_working != 0){
+    while(*connmgr_working == 1){
         pthread_mutex_lock(db_lock);
-        while(*data_sensor_db <= 0){
+        while((*data_sensor_db) <= 0){
             pthread_cond_wait(db_cond, db_lock);
 #ifdef DEBUG
             printf(BLUE_CLR "DB: WAITING FOR DATA.\n" OFF_CLR);
@@ -119,7 +119,7 @@ int sensor_db_listen(DBCONN* conn, sbuffer_t** buffer){
             return -1;
 
         pthread_mutex_lock(db_lock);
-        data_sensor_db--;
+        (*data_sensor_db)--;
         pthread_mutex_unlock(db_lock);
 
     }
@@ -197,7 +197,7 @@ int sql_query(DBCONN* conn, callback_t f, char* sql){
     }
     sqlite3_free(sql);
 #ifdef DEBUG
-    printf(BLUE_CLR "DB: EXECUTED \n%s\n\n" OFF_CLR, sql); 
+    printf(BLUE_CLR "DB: %s\n" OFF_CLR, sql); 
 #endif
     return 0;
 }

@@ -215,7 +215,7 @@ void connmgr_listen(int port_number, sbuffer_t** buffer){
 			}
 
 #ifdef DEBUG
-			printf("TIMEOUT IN: %ld\n", TIMEOUT + poll_at_index->last_modified - time(NULL));
+			// printf("TIMEOUT IN: %ld\n", TIMEOUT + poll_at_index->last_modified - time(NULL));
 #endif
 
 			// if the sensor at index has not sent data in TIMEOUT seconds or it has sent a POLLHUP signal,

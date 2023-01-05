@@ -128,10 +128,7 @@ int main(int argc, char* argv[]){
     pthread_create(&threads[0], NULL, &connmgr_th, &port_number);
     pthread_create(&threads[1], NULL, &datamgr_th, &DMT);
     pthread_create(&threads[2], NULL, &sensor_db_th, &DBT);
-#ifdef DEBUG
-    printf("CREATED THREADS\n");
-    printf("SENSOR GATEWAY STARTED\n");
-#endif
+
     // join all the threads
     for(int i = 0; i < 3; i++)
         pthread_join(threads[i], NULL);

@@ -77,15 +77,13 @@ void datamgr_parse_sensor_files(FILE* fp_sensor_map, sbuffer_t** sbuffer){
     // parse sensor_data, and insert it to the appropriate sensor
     while(*connmgr_working == 1){
         pthread_mutex_lock(datamgr_lock);
-        while(*data_mgr <= 0){
+        while((*data_mgr) <= 0){
+            pthread_cond_wait(data_cond, datamgr_lock);
         #ifdef DEBUG
             printf(GREEN_CLR "DATAMGR: WAITING FOR DATA.\n" OFF_CLR);
         #endif
-            pthread_cond_wait(data_cond, datamgr_lock);
         }
-        #ifdef DEBUG
-            printf(GREEN_CLR "DATAMGR: GOT DATA.\n" OFF_CLR);
-        #endif
+        pthread_mutex_unlock(datamgr_lock);
 
         // create a sensor_data
         sensor_data_t new_data;
@@ -98,8 +96,8 @@ void datamgr_parse_sensor_files(FILE* fp_sensor_map, sbuffer_t** sbuffer){
         
         //add the sensor_data to the sensor_list
         add_sensor_data(&new_data);
-
-        data_mgr--;
+        pthread_mutex_lock(datamgr_lock);
+        (*data_mgr)--;
         pthread_mutex_unlock(datamgr_lock);
     }
 }
@@ -128,7 +126,7 @@ void read_sensor_map(FILE* fp_sensor_map){
             .buffer_position = 0,   .take_avg = false
         };
 #ifdef DEBUG
-        printf(GREEN_CLR); printf("DATAMGR: NEW SENSOR ID: %d  ROOM ID: %d\n", sens.sensor_id, sens.room_id); printf(OFF_CLR);
+        printf(GREEN_CLR "DATAMGR: NEW SENSOR ID: %d  ROOM ID: %d\n"OFF_CLR, sens.sensor_id, sens.room_id);
 #endif
         //add the sensor_t to the sensor_list
         sensor_list = dpl_insert_at_index(sensor_list, &sens, 0, true);
@@ -174,7 +172,7 @@ void add_sensor_data(sensor_data_t* new_data){
         if(sns->running_avg > SET_MAX_TEMP) log_event(sns->sensor_id, sns->running_avg, HOT);
         if(sns->running_avg < SET_MIN_TEMP) log_event(sns->sensor_id, sns->running_avg, COLD);
 #ifdef DEBUG
-        printf(GREEN_CLR "CONNMGR: ID: %u ROOM: %d  AVG: %f   TIME: %ld\n" OFF_CLR,
+        printf(GREEN_CLR "DATAMGR: ID: %u ROOM: %d  AVG: %f   TIME: %ld\n" OFF_CLR,
                 sns->sensor_id, sns->room_id, sns->running_avg, sns->last_modified);
 #endif
     }
