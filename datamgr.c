@@ -26,8 +26,8 @@ static dplist_t* sensor_list;
 
 // helper methods
 static void log_event(sensor_id_t id, sensor_value_t temp, DATAMGR_CASE check);
-void read_sensor_map(FILE* fp_sensor_map);
-void add_sensor_data(sensor_data_t* new_data);
+void datamgr_read_sensor_map(FILE* fp_sensor_map);
+void datamgr_add_sensor_data(sensor_data_t* new_data);
 
 // methods for dpl_create
 void sensor_free(void** element);
@@ -72,7 +72,7 @@ void datamgr_parse_sensor_files(FILE* fp_sensor_map, sbuffer_t** sbuffer){
     sensor_list = dpl_create(sensor_copy, sensor_free, sensor_compare);
 
     // read the sensor_map file
-    read_sensor_map(fp_sensor_map);
+    datamgr_read_sensor_map(fp_sensor_map);
 
     // parse sensor_data, and insert it to the appropriate sensor
     while(*connmgr_working){
@@ -92,7 +92,7 @@ void datamgr_parse_sensor_files(FILE* fp_sensor_map, sbuffer_t** sbuffer){
         if(sbuffer_remove(*sbuffer, &new_data, DATAMGR_THREAD) != SBUFFER_SUCCESS) break;
         
         //add the sensor_data to the sensor_list
-        add_sensor_data(&new_data);
+        datamgr_add_sensor_data(&new_data);
         
         pthread_mutex_lock(datamgr_lock);
         (*data_mgr)--;
@@ -100,7 +100,7 @@ void datamgr_parse_sensor_files(FILE* fp_sensor_map, sbuffer_t** sbuffer){
     }
 }
 
-void read_sensor_map(FILE* fp_sensor_map){
+void datamgr_read_sensor_map(FILE* fp_sensor_map){
     if(fp_sensor_map == NULL){
         fprintf(stderr, "Error: NULL pointer fp_sensor_map\n");
         exit(ERROR_NULL_POINTER);
@@ -131,7 +131,7 @@ void read_sensor_map(FILE* fp_sensor_map){
     }
 }
 
-void add_sensor_data(sensor_data_t* new_data){
+void datamgr_add_sensor_data(sensor_data_t* new_data){
     //find element in list where sensor_id = buffer_id and add the element
     for(int i = 0; i < dpl_size(sensor_list);i++){
         sensor_t* sns = dpl_get_element_at_index(sensor_list, i);
