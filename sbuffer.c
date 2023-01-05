@@ -9,13 +9,13 @@
 #include "sbuffer.h"
 #include "config.h"
 
-#define READ 1
-#define UNREAD 0
+#define READ true
+#define UNREAD false
  // basic node for the buffer, these nodes are linked together to create the buffer
 typedef struct sbuffer_node {
     struct sbuffer_node* next;      // a pointer to the next node
     sensor_data_t data;             // a structure containing the data
-    int reader_threads[READ_TH];    // max two threads can read at the same time
+    bool reader_threads[THREAD_NR]; // check which threads have read the data
 } sbuffer_node_t;
 
 // a structure to keep track of the buffer
@@ -24,6 +24,10 @@ struct sbuffer {
     sbuffer_node_t* tail;       // a pointer to the last node in the buffer 
     pthread_rwlock_t* rwlock;   
 };
+
+// helper methods
+int sbuffer_read(sbuffer_node_t* buffer_node, sensor_data_t* data,READ_TH_ENUM thread);
+void sbuffer_print_tree(sbuffer_node_t *node);
 
 int sbuffer_init(sbuffer_t** buffer){
     *buffer = malloc(sizeof(sbuffer_t));
@@ -61,32 +65,23 @@ int sbuffer_free(sbuffer_t** buffer){
 }
 
 // TODO EITHER FIX THIS OR MAKE ANOTHER METHOD
-// should not remove it immediately
-// make it thread safe
-int sbuffer_remove(sbuffer_t* buffer, sensor_data_t* data, READ_TH_ENUM check){
+int sbuffer_remove(sbuffer_t* buffer, sensor_data_t* data, READ_TH_ENUM thread){
     if(buffer == NULL) return SBUFFER_FAILURE;
     if(buffer->head == NULL) return SBUFFER_NO_DATA;
 
     // read the data
+    buffer->head->reader_threads[0] = READ;
+
     pthread_rwlock_rdlock(buffer->rwlock);
-    *data = buffer->head->data;
+    sbuffer_read(buffer->head, data, thread);
     pthread_rwlock_unlock(buffer->rwlock);
 
-    // here we check if both reader threads (sensor_db and datamgr) have read the file
-    switch(check){
-        case DB_THREAD: 
-            buffer->head->reader_threads[0] = READ;
-            break;
-        case DATAMGR_THREAD: 
-            buffer->head->reader_threads[1] = READ;
-            break;
-    }
-
+    
     // if all reader threads have not read it do not go further
-    for(int i = 0; i < READ_TH; i++)
+    for(int i = 0; i < THREAD_NR; i++)
         if((buffer->head)->reader_threads[i] == UNREAD)
             return SBUFFER_SUCCESS;
-    
+
     // lock to write/remove
     pthread_rwlock_wrlock(buffer->rwlock);
 
@@ -102,6 +97,22 @@ int sbuffer_remove(sbuffer_t* buffer, sensor_data_t* data, READ_TH_ENUM check){
 
     // unlock sbuffer
     pthread_rwlock_unlock(buffer->rwlock);
+
+#ifdef DEBUG
+    printf(YELLOW_CLR "REMOVED FROM BUFFER\n" OFF_CLR);
+#endif
+
+    return SBUFFER_SUCCESS;
+}
+
+int sbuffer_read(sbuffer_node_t* buffer_node, sensor_data_t* data,READ_TH_ENUM thread){
+    // recursive function to read the buffer based on the thread type
+    if(buffer_node == NULL) return SBUFFER_FAILURE;
+    if(buffer_node->reader_threads[thread] == READ) 
+        return sbuffer_read(buffer_node->next, data, thread);
+    
+    *data = buffer_node->data;
+    buffer_node->reader_threads[thread] = READ;
     return SBUFFER_SUCCESS;
 }
 
@@ -130,5 +141,45 @@ int sbuffer_insert(sbuffer_t* buffer, sensor_data_t* data){
 
     // after inserting the data, unlock the buffer
     pthread_rwlock_unlock(buffer->rwlock);
+
+#ifdef DEBUG
+    printf(YELLOW_CLR "INSERTED IN BUFFER\n" OFF_CLR);
+    printf(YELLOW_CLR "CURRENT BUFFER:\n" OFF_CLR);
+    sbuffer_print_tree(buffer->head);
+#endif
     return SBUFFER_SUCCESS;
 }
+
+void sbuffer_print_tree(sbuffer_node_t* node){
+    if(node == NULL) return;
+
+    time_t timestamp = node->data.ts;  // Unix timestamp
+    char time_str[9];               // buffer for the human-readable time string
+    struct tm *timeinfo = localtime(&timestamp);
+    strftime(time_str, sizeof(time_str), "%T", timeinfo);
+
+    printf(YELLOW_CLR);
+    printf("+-------------------------+\n");
+    printf("    node: %p\t\n", node);
+
+    printf("|+-----------------------+|\n");
+    printf("||  id:        %u        ||\n", node->data.id);
+    printf("||  value:     %.2f     ||\n", node->data.value);
+    printf("||  timestamp: %s  ||\n", time_str);
+    printf("||  reader threads: ");
+    for(int i = 0; i < THREAD_NR; i++){
+        printf("%d ", node->reader_threads[i]);
+    }
+    printf(" ||\n");
+    printf("|+-----------------------+|\n");
+    printf("    next:      %p\t\n", node->next);
+    printf("+-------------------------+\n");
+    if(node->next != NULL){
+        printf("|                         |\n");
+        printf("v                         v\n");
+    }
+    printf(OFF_CLR);
+
+    sbuffer_print_tree(node->next);
+}
+

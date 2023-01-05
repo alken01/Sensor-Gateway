@@ -12,12 +12,12 @@
 #define SBUFFER_NO_DATA 1
 
 // enum to differentiate between the datamgr and db reader threads
+#define THREAD_NR 2
 typedef enum {
-    DATAMGR_THREAD, DB_THREAD
+    DATAMGR_THREAD = 0,
+    DB_THREAD = 1
 } READ_TH_ENUM;
 
-// we use two threads
-#define READ_TH 2
 
 typedef struct sbuffer sbuffer_t;
 
