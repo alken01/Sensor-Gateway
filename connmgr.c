@@ -30,7 +30,6 @@ int element_compare(void* x, void* y);
 
 // helper functions
 void element_print(sensor_data_t sensor_data);
-int dpl_check_unique(dplist_t* list, sensor_id_t* data_id);
 static void log_event(char* log_event, int sensor_id);
 
 // global variables
@@ -45,7 +44,7 @@ static pthread_mutex_t* db_lock;
 static int* data_sensor_db;
 
 static pthread_rwlock_t* connmgr_lock;
-static int* connmgr_working;
+static bool* connmgr_working;
 
 static pthread_mutex_t* fifo_mutex;
 static int* fifo_fd;
@@ -98,12 +97,9 @@ void connmgr_listen(int port_number, sbuffer_t** buffer){
 	// add the poll_server as the first index 
 	dpl_connections = dpl_insert_at_index(dpl_connections, &poll_server, 0, true);
 
-
-	int list_size;
-	int while_loop = 1;
-	while(while_loop){
+	do{
 		// get size of list
-		list_size = dpl_size(dpl_connections);
+		int list_size = dpl_size(dpl_connections);
 
 		// iterate through the list
 		for(int index = 0; index < list_size; index++){
@@ -157,15 +153,7 @@ void connmgr_listen(int port_number, sbuffer_t** buffer){
 #endif
 				// update the ID and log_event if this is the first data from this sensor
 				if(poll_at_index->sensor_id != sensor_data.id){
-					//check if it is a duplicate sensor
-					// if(!dpl_check_unique(dpl_connections, &sensor_data.id)){
-					// 	log_event("NON-UNIQUE SERVER OPENED ID:", sensor_data.id);
-					// 	tcp_close(&(poll_at_index->socket_id));
-					// 	dpl_connections = dpl_remove_at_index(dpl_connections, index, true);
-					// 	list_size = dpl_size(dpl_connections);
-					// 	break;
-					// }
-					
+
 					// update the sensor ID and log the event
 					poll_at_index->sensor_id = sensor_data.id;
 					log_event("NEW CONNECTION SENSOR ID:", poll_at_index->sensor_id);
@@ -175,14 +163,7 @@ void connmgr_listen(int port_number, sbuffer_t** buffer){
 				}
 
 				//update the poll_at_index time
-				poll_at_index->last_modified = time(NULL);
-
-				//add it in the buffer
-				// sensor_data_t insert_data = {
-				// 	.id = sensor_data.id,
-				// 	.value = sensor_data.value,
-				// 	.ts = sensor_data.ts
-				// };
+				poll_at_index->last_modified = sensor_data.ts;
 
 				// insert it in the buffer
 				// sbuffer_insert(*buffer, &insert_data); //CHECK IF THIS IS CORRECT
@@ -190,28 +171,22 @@ void connmgr_listen(int port_number, sbuffer_t** buffer){
 
 				// let the other threads know there is data to read
 				pthread_mutex_lock(datamgr_lock);
-				(*data_mgr)++;
-				pthread_mutex_unlock(datamgr_lock);
-
 				pthread_mutex_lock(db_lock);
-				(*data_sensor_db)++;
-				pthread_mutex_unlock(db_lock);
 
-				// signal the other threads	(TODO CHECK IF THIS IS CORRECT)
+				(*data_mgr)++;
 				pthread_cond_broadcast(data_cond);
+
+				(*data_sensor_db)++;
 				pthread_cond_broadcast(db_cond);
 
-				//update the poll_at_index time
-				poll_at_index->last_modified = time(NULL);
+				pthread_mutex_unlock(datamgr_lock);
+				pthread_mutex_unlock(db_lock);			
 
 				// print it in the text file
 				fprintf(fp_sensor_data_text, "ID: %u   VAL: %f   TIME: %ld\n", sensor_data.id, sensor_data.value, sensor_data.ts);
 #ifdef DEBUG
 				printf(PURPLE_CLR "CONNMGR: ID: %u   VAL: %f   TIME: %ld\n"OFF_CLR, sensor_data.id, sensor_data.value, sensor_data.ts);
 #endif
-				// } else if(result == TCP_CONNECTION_CLOSED){
-				// 	poll_at_index->file_d.revents = POLLHUP;
-
 			}
 
 #ifdef DEBUG
@@ -239,14 +214,14 @@ void connmgr_listen(int port_number, sbuffer_t** buffer){
 				tcp_close(&(poll_server.socket_id));
 				connmgr_free();
 				fclose(fp_sensor_data_text);
-				while_loop = 0;
+				pthread_rwlock_wrlock(connmgr_lock);
+				*connmgr_working = false;
+				pthread_rwlock_unlock(connmgr_lock);
 				break;
 			}
 		}
 	}
-	pthread_rwlock_wrlock(connmgr_lock);
-	*connmgr_working = 0;
-	pthread_rwlock_unlock(connmgr_lock);
+	while(*connmgr_working);
 
 #ifdef DEBUG
 	printf(PURPLE_CLR "CLOSING CONNMGR.\n" OFF_CLR);
@@ -276,7 +251,7 @@ void element_free(void** element){
 int element_compare(void* x, void* y){
 	sensor_id_t x_id = *(sensor_id_t*) x;
 	sensor_id_t y_id = ((poll_info_t*) y)->sensor_id;
-	return (x_id == y_id) ? 0 : ((x_id > y_id) ? 1 : -1); // if x_id == y_id return 0, if x_id > y_id return 1, else return -1
+	return (x_id == y_id) ? 0 : ((x_id > y_id) ? 1 : -1);
 }
 
 
@@ -287,14 +262,3 @@ static void log_event(char* log_event, int sensor_id){
 	fprintf(fp_log, "\nSEQ_NR: xxx  TIME: %ld\n%s %d\n", time(NULL), log_event, sensor_id);
 	fclose(fp_log);
 }
-
-// check if the sensor_id is unique, else return fasle
-int dpl_check_unique(dplist_t* list, sensor_id_t* data_id){
-	int list_size = dpl_size(list);
-	if(list_size <= 1) return true;
-	for(int i = 0; i < dpl_size(list); i++)
-		if(element_compare(data_id, dpl_get_element_at_index(list, i)) == 0)
-			return false;
-	return true;
-}
-

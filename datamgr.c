@@ -46,7 +46,7 @@ static pthread_mutex_t* db_lock;
 static int* data_sensor_db;
 
 static pthread_rwlock_t* connmgr_lock;
-static int* connmgr_working;
+static bool* connmgr_working;
 
 static pthread_mutex_t* fifo_mutex;
 static int* fifo_fd;
@@ -75,7 +75,7 @@ void datamgr_parse_sensor_files(FILE* fp_sensor_map, sbuffer_t** sbuffer){
     read_sensor_map(fp_sensor_map);
 
     // parse sensor_data, and insert it to the appropriate sensor
-    while(*connmgr_working == 1){
+    while(*connmgr_working){
         pthread_mutex_lock(datamgr_lock);
         while((*data_mgr) <= 0){
             pthread_cond_wait(data_cond, datamgr_lock);

@@ -48,7 +48,7 @@ lib/libtcpsock.so : lib/tcpsock.c
 .PHONY : clean clean-all run zip
 
 clean:
-	rm -rf *.o sensor_gateway sensor_node file_creator *~ lib/*.o *.db *.FIFO gateway.log *.zip sensor_data_recv 
+	rm -rf *.o sensor_gateway sensor_node file_creator *~ lib/*.o *.db *.FIFO gateway.log *.zip sensor_data_recv *.db*
 
 clean-all: clean
 	rm -rf lib/*.so

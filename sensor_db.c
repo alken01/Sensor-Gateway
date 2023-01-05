@@ -28,7 +28,7 @@ static pthread_mutex_t* db_lock;
 static int* data_sensor_db;
 
 static pthread_rwlock_t* connmgr_lock;
-static int* connmgr_working;
+static bool* connmgr_working;
 
 static pthread_mutex_t* fifo_mutex;
 static int* fifo_fd;

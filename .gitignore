@@ -22,3 +22,4 @@ lib/*.o
 .idea/*
 sensor_node
 sensor_gateway
+*.db*

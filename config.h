@@ -78,7 +78,7 @@ typedef struct {
     int* data_sensor_db;
 
     pthread_rwlock_t* connmgr_lock;
-    int* connmgr_working;
+    bool* connmgr_working;
 
     pthread_mutex_t* fifo_mutex;
     int* fifo_fd;

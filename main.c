@@ -39,7 +39,7 @@ pthread_mutex_t db_lock;
 int* data_sensor_db;
 
 pthread_rwlock_t connmgr_lock;
-int* connmgr_working;
+bool* connmgr_working;
 
 pthread_mutex_t fifo_mutex;
 int* fifo_fd;
@@ -98,7 +98,7 @@ int main(int argc, char* argv[]){
 
     data_mgr = malloc(sizeof(int));
     data_sensor_db = malloc(sizeof(int));
-    connmgr_working = malloc(sizeof(int));
+    connmgr_working = malloc(sizeof(bool));
     fifo_fd = malloc(sizeof(int));
 #ifdef DEBUG
     printf("INITIALIZED INTS\n");
