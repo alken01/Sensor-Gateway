@@ -104,6 +104,7 @@ void connmgr_listen(int port_number, sbuffer_t** buffer){
 	// get size of list
 	int list_size = dpl_size(dpl_connections);
 	while(*connmgr_working){
+		
 		// iterate through the list
 		for(int index = 0; index < list_size; index++){
 
@@ -164,7 +165,6 @@ void connmgr_listen(int port_number, sbuffer_t** buffer){
 			}
 		}
 	} 
-
 #ifdef DEBUG
 	printf(PURPLE_CLR "CLOSING CONNMGR.\n" OFF_CLR);
 #endif

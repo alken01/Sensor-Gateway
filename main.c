@@ -58,28 +58,27 @@ int main(int argc, char* argv[]){
     int port_number = atoi(argv[1]);
 
     // fork into two processes
-    // int pid = fork();
-    // if(pid == -1) return -1;
+    int pid = fork();
+    if(pid == -1) return -1;
 
     // make a FIFO special file 
-    // if(mkfifo("log.FIFO", 0777) == -1){
-    //     if(errno != EEXIST){
-    //         printf("Could not create fifo file\n");
-    //         return -1;
-    //     }
-    // }
+    if(mkfifo("log.FIFO", 0777) == -1){
+        if(errno != EEXIST){
+            printf("Could not create fifo file\n");
+            return -1;
+         }
+    }
 
     // initialize fifo file descriptor
     // TODO: chekck if putting this lower in the program works
-    // int* fifo_fd;
+    int* fifo_fd;
 
     // // the child handles the log process
-    // if(pid == 0){
+    if(pid == 0){
     //     //open the log file
-    //     FILE* gateway_log = fopen("gateway.log", "w");
+        FILE* gateway_log = fopen("gateway.log", "w");
 
     //     //open the log FIFO
-    //     *main_thread->fifo_fd = open("log.FIFO", O_RDONLY);
 
     //     //read from fifo
     //     //TODO: CHANGE THIS
@@ -87,10 +86,9 @@ int main(int argc, char* argv[]){
     //     //     fprintf(gateway_log, "%s", str_recv);
     //     //     printf("wrote on file %s \n", str_recv);
     //     // }
-    //     fclose(gateway_log);
-    //     close(*main_thread->fifo_fd);
-    //     exit(EXIT_SUCCESS);
-    // }
+        fclose(gateway_log);
+        exit(EXIT_SUCCESS);
+    }
 
     // fifo_fd = malloc(sizeof(int));
     // *fifo_fd = open("log.FIFO", O_WRONLY);
@@ -98,20 +96,21 @@ int main(int argc, char* argv[]){
 #ifdef DEBUG
     printf("INITIALIZING SENSOR GATEWAY\n");
 #endif
-
+    
+    // initialize all the variables
     data_mgr = malloc(sizeof(int));
     data_sensor_db = malloc(sizeof(int));
     connmgr_working = malloc(sizeof(bool));
     fifo_fd = malloc(sizeof(int));
-#ifdef DEBUG
-    printf("INITIALIZED INTS\n");
-#endif
 
+    *data_mgr = 0;
+	*data_sensor_db = 0;
+	*connmgr_working = true;
+
+    // initialize the buffer
     sbuffer_init(&buffer);
-#ifdef DEBUG
-    printf("INITIALIZED SBUFFER\n");
-#endif
 
+    // initialize the pthreads
     pthread_cond_init(&data_cond, NULL);
     pthread_mutex_init(&datamgr_lock, NULL);
     
@@ -120,31 +119,22 @@ int main(int argc, char* argv[]){
 
     pthread_rwlock_init(&connmgr_lock, NULL);    
     pthread_mutex_init(&fifo_mutex, NULL);
+
 #ifdef DEBUG
-    printf("INITIALIZED PTHREADS\n");
+    printf("INITIALIZING THREADS\n");
 #endif
-
-    // create three threads
-
+    // create the threads
     pthread_t threads[MAIN_PROCESS_THREAD_NR];
-    READ_TH_ENUM DMT = DATAMGR_THREAD;
-    READ_TH_ENUM DBT = DB_THREAD;
-    
+    // connmgr thread
     pthread_create(&threads[0], NULL, &connmgr_th, &port_number);
-#ifdef DEBUG
-    printf("INITIALIZED CONNMGR THREAD\n");
-#endif
+    // database thread
+    READ_TH_ENUM DBT = DB_THREAD;
     pthread_create(&threads[1], NULL, &sensor_db_th, &DBT);
-#ifdef DEBUG
-    printf("INITIALIZED DB THREAD\n");
-#endif
+    // datamgr thread
+    READ_TH_ENUM DMT = DATAMGR_THREAD;
     pthread_create(&threads[2], NULL, &datamgr_th, &DMT);
-#ifdef DEBUG
-    printf("INITIALIZED DATAMGR THREAD\n");
-#endif
 
-
-    // join all the threads
+    // join all the threads after they are done
     for(int i = 0; i < MAIN_PROCESS_THREAD_NR; i++)
         pthread_join(threads[i], NULL);
 
@@ -164,7 +154,6 @@ int main(int argc, char* argv[]){
     free(data_mgr);
     free(data_sensor_db);
     free(connmgr_working);
-    free(fifo_fd);
     close(*fifo_fd);
     free(fifo_fd);
     sbuffer_free(&buffer);
@@ -199,6 +188,7 @@ void* connmgr_th(void* arg){
     connmgr_init(&connmgr_config_thread);
     connmgr_listen(port_number, &buffer);
     connmgr_free();
+
 #ifdef DEBUG
     printf(RED_CLR"CLOSING CONNMGR_THR\n"OFF_CLR);
 #endif
@@ -227,7 +217,6 @@ void* sensor_db_th(void* arg){
     main_init_thread(&sensor_db_config_thread);
 
     sensor_db_init(&sensor_db_config_thread);
-    
     DBCONN* conn = init_connection(DB_FLAG);
     sensor_db_listen(conn, &buffer);
     disconnect(conn);
