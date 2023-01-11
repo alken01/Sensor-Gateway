@@ -91,27 +91,20 @@ void datamgr_parse_sensor_files(FILE* fp_sensor_map, sbuffer_t** sbuffer){
             break;
         }
 
-        #ifdef DEBUG
-            printf(GREEN_CLR "DATAMGR: GOT DATA. %ld\n" OFF_CLR, time(NULL));
-        #endif
         pthread_mutex_unlock(datamgr_lock);
 
-        // create a sensor_data
+        // copy the data
         sensor_data_t new_data;
-
-        // copy the data at the head of the buffer
-        if(sbuffer_remove(*sbuffer, &new_data, DATAMGR_THREAD) == SBUFFER_FAILURE){
-        #ifdef DEBUG
-            printf(GREEN_CLR "DATAMGR: SBUFFER_FAILURE. %ld\n" OFF_CLR, time(NULL));
-        #endif
+        int res = sbuffer_remove(*sbuffer, &new_data, DATAMGR_THREAD);
+        if( res != SBUFFER_SUCCESS) {
+            printf(GREEN_CLR "DATAMGR: SBUFFER ERROR %d\n" OFF_CLR, res);
             break;
-        }            
-        if(sbuffer_remove(*sbuffer, &new_data, DATAMGR_THREAD) == SBUFFER_NO_DATA){
-             pthread_mutex_lock(datamgr_lock);
-            (*data_mgr)--;
-            pthread_mutex_unlock(datamgr_lock);
-            continue;
         }
+
+#ifdef DEBUG
+            printf(GREEN_CLR "DATAMGR: NEW DATA - ID: %u  VAL: %f   TIME: %ld\n" OFF_CLR,
+                new_data.id, new_data.value, new_data.ts);
+#endif            
         //add the sensor_data to the sensor_list
         datamgr_add_sensor_data(&new_data);
         
@@ -154,6 +147,9 @@ void datamgr_read_sensor_map(FILE* fp_sensor_map){
 
 void datamgr_add_sensor_data(sensor_data_t* new_data){
     //find element in list where sensor_id = buffer_id and add the element
+    bool added = false;
+
+
     for(int i = 0; i < dpl_size(sensor_list);i++){
         sensor_t* sns = dpl_get_element_at_index(sensor_list, i);
 
@@ -174,6 +170,8 @@ void datamgr_add_sensor_data(sensor_data_t* new_data){
 
         //update the timestamp
         sns->last_modified = new_data->ts;
+                
+        added = true;
 
         //if the buffer is not full we don't take the average
         if(sns->take_avg == false){
@@ -199,6 +197,11 @@ void datamgr_add_sensor_data(sensor_data_t* new_data){
 #ifdef DEBUG
         printf(GREEN_CLR "DATAMGR: ID: %u ROOM: %d  AVG: %f   TIME: %ld\n" OFF_CLR,
                 sns->sensor_id, sns->room_id, sns->running_avg, sns->last_modified);
+#endif
+    }
+    if(!added){
+#ifdef DEBUG
+        printf(GREEN_CLR "DATAMGR: DID NOT ADD DATA\n" OFF_CLR);
 #endif
     }
 }

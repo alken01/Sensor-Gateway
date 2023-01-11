@@ -22,6 +22,9 @@
 #include "lib/dplist.h"
 
 #define MAIN_PROCESS_THREAD_NR 3
+// define as 1 to drop existing table, 0 to keep existing table
+#define DB_FLAG 1
+
 // functions
 void* connmgr_th(void* arg);
 void* datamgr_th(void* arg);
@@ -126,6 +129,7 @@ int main(int argc, char* argv[]){
     pthread_t threads[MAIN_PROCESS_THREAD_NR];
     READ_TH_ENUM DMT = DATAMGR_THREAD;
     READ_TH_ENUM DBT = DB_THREAD;
+    
     pthread_create(&threads[0], NULL, &connmgr_th, &port_number);
 #ifdef DEBUG
     printf("INITIALIZED CONNMGR THREAD\n");
@@ -161,8 +165,8 @@ int main(int argc, char* argv[]){
     free(data_sensor_db);
     free(connmgr_working);
     free(fifo_fd);
-    // close(*fifo_fd);
-    // free(fifo_fd);
+    close(*fifo_fd);
+    free(fifo_fd);
     sbuffer_free(&buffer);
 
 #ifdef DEBUG
@@ -223,7 +227,8 @@ void* sensor_db_th(void* arg){
     main_init_thread(&sensor_db_config_thread);
 
     sensor_db_init(&sensor_db_config_thread);
-    DBCONN* conn = init_connection(1);
+    
+    DBCONN* conn = init_connection(DB_FLAG);
     sensor_db_listen(conn, &buffer);
     disconnect(conn);
 #ifdef DEBUG

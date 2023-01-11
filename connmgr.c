@@ -225,7 +225,10 @@ void connmgr_add_sensor_data(sbuffer_t** buffer, poll_info_t** poll_at_index, se
 
 	//update the poll_at_index time
 	(*poll_at_index)->last_modified = sensor_data->ts;
-	sbuffer_insert(*buffer, sensor_data);
+	int res = sbuffer_insert(*buffer, sensor_data);
+#ifdef DEBUG
+		printf(PURPLE_CLR "CONNMGR: SBUFFER ERROR: %d\n"OFF_CLR, res);
+#endif
 }
 
 void connmgr_update_threads(){

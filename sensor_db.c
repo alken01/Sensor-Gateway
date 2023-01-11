@@ -112,9 +112,6 @@ int sensor_db_listen(DBCONN* conn, sbuffer_t** buffer){
             pthread_mutex_unlock(db_lock);
             break;
         }
-        #ifdef DEBUG
-            printf(BLUE_CLR "DB: GOT DATA. %ld\n" OFF_CLR, time(NULL));
-        #endif
         pthread_mutex_unlock(db_lock);
 
         // copy the data
@@ -125,6 +122,9 @@ int sensor_db_listen(DBCONN* conn, sbuffer_t** buffer){
         if(insert_sensor(conn, new_data.id, new_data.value, new_data.ts) != 0)
             return -1;
 
+#ifdef DEBUG
+            printf(BLUE_CLR "DB: GOT DATA. %ld\n" OFF_CLR, time(NULL));
+#endif
         pthread_mutex_lock(db_lock);
         (*data_sensor_db)--;
         pthread_mutex_unlock(db_lock);

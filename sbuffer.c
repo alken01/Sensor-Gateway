@@ -71,9 +71,6 @@ int sbuffer_remove(sbuffer_t* buffer, sensor_data_t* data, READ_TH_ENUM thread){
     if(buffer == NULL) return SBUFFER_FAILURE;
     if(buffer->head == NULL) return SBUFFER_NO_DATA;
 
-    // read the data
-    buffer->head->reader_threads[0] = READ;
-
     pthread_rwlock_rdlock(buffer->rwlock);
     sbuffer_read(buffer->head, data, thread);
     pthread_rwlock_unlock(buffer->rwlock);
