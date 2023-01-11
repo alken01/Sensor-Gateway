@@ -30,8 +30,10 @@ int element_compare(void* x, void* y);
 
 // helper functions
 static void log_event(char* log_event, int sensor_id);
-void connmgr_add_sensor(poll_info_t** poll_at_index, int* list_size);
-void connmgr_add_sensor_data(sbuffer_t** buffer, poll_info_t** poll_at_index, sensor_data_t* sensor_data);
+int connmgr_add_sensor(poll_info_t** poll_at_index, int* list_size);
+int connmgr_add_sensor_data(sbuffer_t** buffer, poll_info_t** poll_at_index, sensor_data_t* sensor_data);
+void connmgr_remove_sensor(int* list_size, int index, poll_info_t** poll_at_index, poll_info_t* poll_server);
+
 void connmgr_notify_threads();
 void connmgr_update_threads();
 void connmgr_close_threads();
@@ -119,7 +121,9 @@ void connmgr_listen(int port_number, sbuffer_t** buffer){
 		if(poll_nr > 0 && poll_events == POLLIN){
 			// in the first index we will only get notified about new connections 
 			if(index == 0){
-				connmgr_add_sensor(&poll_at_index, &list_size);
+				if(connmgr_add_sensor(&poll_at_index, &list_size)!= TCP_NO_ERROR){
+					continue;
+				}
 #ifdef DEBUG
 				printf(PURPLE_CLR "CONNMGR: NEW CONNECTION.\n" OFF_CLR);
 #endif
@@ -128,34 +132,30 @@ void connmgr_listen(int port_number, sbuffer_t** buffer){
 				sensor_data_t sensor_data;
 
 				// add it in the buffer
-				connmgr_add_sensor_data(buffer, &(poll_at_index), &sensor_data);
+				if(connmgr_add_sensor_data(buffer, &(poll_at_index), &sensor_data) != TCP_NO_ERROR){
+					// if error remove the sensor
+					connmgr_remove_sensor(&list_size, index, &poll_at_index, &poll_server);
+					continue;
+				}
 
 				// update the datamgr and db threads
 				connmgr_update_threads();
 
 				// print it in the text file
-				fprintf(fp_sensor_data_text, "ID: %u   VAL: %f   TIME: %ld\n", sensor_data.id, sensor_data.value, sensor_data.ts);
+				fprintf(fp_sensor_data_text, "ID: %u   VAL: %f   TIME: %ld\n", 
+						sensor_data.id, sensor_data.value, sensor_data.ts);
 #ifdef DEBUG
-				printf(PURPLE_CLR "CONNMGR: ID: %u   VAL: %f   TIME: %ld\n"OFF_CLR, sensor_data.id, sensor_data.value, sensor_data.ts);
+				printf(PURPLE_CLR "CONNMGR: ID: %u   VAL: %f   TIME: %ld\n"OFF_CLR, 
+						sensor_data.id, sensor_data.value, sensor_data.ts);
 #endif
 			}
 		}
 
 
-		// REMOVE SENSOR IF:
+		// REMOVE THE SENSOR IF:
 		// not sent data in TIMEOUT seconds || a POLLHUP signal
 		if((poll_at_index->last_modified < timeout_ts && index > 0) || poll_events == POLLHUP){
-#ifdef DEBUG
-			printf(PURPLE_CLR "CLOSED CONNECTION SENSOR ID: %d\n"OFF_CLR, poll_at_index->sensor_id);
-#endif
-			// remove the sensor
-			log_event("CLOSED CONNECTION SENSOR ID:", poll_at_index->sensor_id);
-			tcp_close(&(poll_at_index->socket_id));
-			dpl_connections = dpl_remove_at_index(dpl_connections, index, true);
-			list_size--; // decrement the list size
-
-			// update the last modified time of the poll_server
-			poll_server.last_modified = time(NULL);
+			connmgr_remove_sensor(&list_size, index, &poll_at_index, &poll_server);
 		}
 
 		// STOP THE CONNMGR IF:
@@ -181,13 +181,31 @@ void connmgr_free(){
 	dpl_free(&dpl_connections, true);
 }
 
-void connmgr_add_sensor(poll_info_t** poll_at_index, int* list_size){
+void connmgr_remove_sensor(int* list_size, int index, poll_info_t** poll_at_index, poll_info_t* poll_server){
+#ifdef DEBUG
+	printf(PURPLE_CLR "CLOSED CONNECTION SENSOR ID: %d\n"OFF_CLR, (*poll_at_index)->sensor_id);
+#endif
+	// remove the sensor
+	log_event("CLOSED CONNECTION SENSOR ID:", (*poll_at_index)->sensor_id);
+	tcp_close(&((*poll_at_index)->socket_id));
+	dpl_connections = dpl_remove_at_index(dpl_connections, index, true);
+	(*list_size)--; // decrement the list size
+
+	// update the last modified time of the poll_server
+	poll_server->last_modified = time(NULL);
+}
+int connmgr_add_sensor(poll_info_t** poll_at_index, int* list_size){
 	tcpsock_t* new_socket;
-	if(tcp_wait_for_connection((*poll_at_index)->socket_id, &new_socket) != TCP_NO_ERROR) printf(PURPLE_CLR "ERROR WAITING TCP CONNECTION.\n" OFF_CLR), exit(EXIT_FAILURE);
+	if(tcp_wait_for_connection((*poll_at_index)->socket_id, &new_socket) != TCP_NO_ERROR){
+		printf(PURPLE_CLR "ERROR WAITING TCP CONNECTION.\n" OFF_CLR);
+		return TCP_CONNECTION_CLOSED;
+	}
 
 	pollfd_t new_fd;
-	if(tcp_get_sd(new_socket, &(new_fd.fd)) != TCP_NO_ERROR) 
-	printf(PURPLE_CLR "ERROR GETTING TCP SD.\n" OFF_CLR), exit(EXIT_FAILURE);
+	if(tcp_get_sd(new_socket, &(new_fd.fd)) != TCP_NO_ERROR) {
+		printf(PURPLE_CLR "ERROR GETTING TCP SD.\n" OFF_CLR);
+		return TCP_SOCKET_ERROR;
+	}
 
 	// initialise the sensor
 	poll_info_t insert_sensor = {
@@ -202,9 +220,10 @@ void connmgr_add_sensor(poll_info_t** poll_at_index, int* list_size){
 	// insert the sensor in the list
 	dpl_connections = dpl_insert_at_index(dpl_connections, &insert_sensor, dpl_size(dpl_connections), true);
 	(*list_size)++; //update list_size
+	return TCP_NO_ERROR;
 }
 
-void connmgr_add_sensor_data(sbuffer_t** buffer, poll_info_t** poll_at_index, sensor_data_t* sensor_data){
+int connmgr_add_sensor_data(sbuffer_t** buffer, poll_info_t** poll_at_index, sensor_data_t* sensor_data){
 
 	// get the buf_size
 	int sit = (int) sizeof(sensor_id_t);
@@ -212,7 +231,10 @@ void connmgr_add_sensor_data(sbuffer_t** buffer, poll_info_t** poll_at_index, se
 	int stt = (int) sizeof(sensor_ts_t);
 
 	//receive the data
-	if(tcp_receive((*poll_at_index)->socket_id, &(sensor_data->id), &sit) != TCP_NO_ERROR) printf(PURPLE_CLR "ERROR RECEIVING TCP DATA.\n" OFF_CLR), exit(EXIT_FAILURE);
+	if(tcp_receive((*poll_at_index)->socket_id, &(sensor_data->id), &sit) != TCP_NO_ERROR){
+		printf(PURPLE_CLR "ERROR RECEIVING TCP DATA.\n" OFF_CLR);
+		return TCP_SOCKET_ERROR;
+	}
 	tcp_receive((*poll_at_index)->socket_id, &(sensor_data->value), &sdt);
 	tcp_receive((*poll_at_index)->socket_id, &(sensor_data->ts), &stt);
 
@@ -232,11 +254,10 @@ void connmgr_add_sensor_data(sbuffer_t** buffer, poll_info_t** poll_at_index, se
 
 	//update the poll_at_index time
 	(*poll_at_index)->last_modified = sensor_data->ts;
-	int res = sbuffer_insert(*buffer, sensor_data);
-#ifdef DEBUG
-	if(res != SBUFFER_SUCCESS)
-		printf(PURPLE_CLR "CONNMGR: SBUFFER ERROR: %d\n"OFF_CLR, res);
-#endif
+	
+	if(sbuffer_insert(*buffer, sensor_data) != SBUFFER_SUCCESS)
+		printf("CONNMGR: SBUFFER ERROR\n");
+	return TCP_NO_ERROR;
 }
 
 void connmgr_update_threads(){
