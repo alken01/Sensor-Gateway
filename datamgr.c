@@ -68,6 +68,9 @@ void datamgr_init(config_thread_t* config_thread){
 }
 
 void datamgr_parse_sensor_files(FILE* fp_sensor_map, sbuffer_t** sbuffer){
+#ifdef DEBUG
+    printf(GREEN_CLR "DATAMGR: INITIATING DATAMGR.\n"OFF_CLR);
+#endif
     // initialize the sensor_list
     sensor_list = dpl_create(sensor_copy, sensor_free, sensor_compare);
 
@@ -77,20 +80,38 @@ void datamgr_parse_sensor_files(FILE* fp_sensor_map, sbuffer_t** sbuffer){
     // parse sensor_data, and insert it to the appropriate sensor
     while(*connmgr_working){
         // pthread_mutex_lock(datamgr_lock);
-        while((*data_mgr) <= 0){
+        while((*data_mgr) == 0){
             pthread_cond_wait(data_cond, datamgr_lock);
         #ifdef DEBUG
             printf(GREEN_CLR "DATAMGR: WAITING FOR DATA.\n" OFF_CLR);
         #endif
         }
+        if(*connmgr_working == false){
+            pthread_mutex_unlock(datamgr_lock);
+            break;
+        }
+
+        #ifdef DEBUG
+            printf(GREEN_CLR "DATAMGR: GOT DATA. %ld\n" OFF_CLR, time(NULL));
+        #endif
         pthread_mutex_unlock(datamgr_lock);
 
         // create a sensor_data
         sensor_data_t new_data;
 
         // copy the data at the head of the buffer
-        if(sbuffer_remove(*sbuffer, &new_data, DATAMGR_THREAD) != SBUFFER_SUCCESS) break;
-        
+        if(sbuffer_remove(*sbuffer, &new_data, DATAMGR_THREAD) == SBUFFER_FAILURE){
+        #ifdef DEBUG
+            printf(GREEN_CLR "DATAMGR: SBUFFER_FAILURE. %ld\n" OFF_CLR, time(NULL));
+        #endif
+            break;
+        }            
+        if(sbuffer_remove(*sbuffer, &new_data, DATAMGR_THREAD) == SBUFFER_NO_DATA){
+             pthread_mutex_lock(datamgr_lock);
+            (*data_mgr)--;
+            pthread_mutex_unlock(datamgr_lock);
+            continue;
+        }
         //add the sensor_data to the sensor_list
         datamgr_add_sensor_data(&new_data);
         

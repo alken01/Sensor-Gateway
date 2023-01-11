@@ -51,6 +51,9 @@ void sensor_db_init(config_thread_t* config_thread){
 
 
 DBCONN* init_connection(char clear_up_flag){
+#ifdef DEBUG
+    printf(BLUE_CLR "DB: INITIATING SQL SERVER CONNECTION.\n"OFF_CLR);
+#endif
     DBCONN* db;
     if(sqlite3_open(DB_NAME_STRING, &db) != SQLITE_OK){ //if database can't open
         fprintf(stderr, "CANNOT OPEN DATABASE: %s\n", sqlite3_errmsg(db));
@@ -97,14 +100,21 @@ void disconnect(DBCONN* conn){
 }
 
 int sensor_db_listen(DBCONN* conn, sbuffer_t** buffer){
-    while(*connmgr_working == 1){
+    while(*connmgr_working == true){
         pthread_mutex_lock(db_lock);
-        while((*data_sensor_db) <= 0){
+        while((*data_sensor_db) == 0){
             pthread_cond_wait(db_cond, db_lock);
         #ifdef DEBUG
             printf(BLUE_CLR "DB: WAITING FOR DATA.\n" OFF_CLR);
         #endif
         }
+        if(*connmgr_working == false){
+            pthread_mutex_unlock(db_lock);
+            break;
+        }
+        #ifdef DEBUG
+            printf(BLUE_CLR "DB: GOT DATA. %ld\n" OFF_CLR, time(NULL));
+        #endif
         pthread_mutex_unlock(db_lock);
 
         // copy the data
@@ -193,7 +203,7 @@ int sql_query(DBCONN* conn, callback_t f, char* sql){
         return -1;
     }
 #ifdef DEBUG
-    printf(BLUE_CLR "DB: %s\n" OFF_CLR, sql); 
+    printf(BLUE_CLR "DB: %s %ld\n" OFF_CLR, sql,time(NULL)); 
 #endif
     sqlite3_free(sql);
     return 0;

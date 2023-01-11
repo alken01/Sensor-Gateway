@@ -54,8 +54,8 @@ clean-all: clean
 	rm -rf lib/*.so
 
 run : sensor_gateway sensor_node
-#  	valgrind --leak-check=full --show-leak-kinds=all ./sensor_gateway 3756
-	./sensor_gateway 3756
+	valgrind --leak-check=full --show-leak-kinds=all ./sensor_gateway 3756
+#	./sensor_gateway 3756
 
 node : sensor_node 
 	./sensor_node 15 3 127.0.0.1 3756 

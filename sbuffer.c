@@ -27,7 +27,10 @@ struct sbuffer {
 
 // helper methods
 int sbuffer_read(sbuffer_node_t* buffer_node, sensor_data_t* data,READ_TH_ENUM thread);
+
+#ifdef DEBUG
 void sbuffer_print_tree(sbuffer_node_t *node);
+#endif
 
 int sbuffer_init(sbuffer_t** buffer){
     *buffer = malloc(sizeof(sbuffer_t));
@@ -64,7 +67,6 @@ int sbuffer_free(sbuffer_t** buffer){
     return SBUFFER_SUCCESS;
 }
 
-// TODO EITHER FIX THIS OR MAKE ANOTHER METHOD
 int sbuffer_remove(sbuffer_t* buffer, sensor_data_t* data, READ_TH_ENUM thread){
     if(buffer == NULL) return SBUFFER_FAILURE;
     if(buffer->head == NULL) return SBUFFER_NO_DATA;
@@ -107,7 +109,7 @@ int sbuffer_remove(sbuffer_t* buffer, sensor_data_t* data, READ_TH_ENUM thread){
 
 int sbuffer_read(sbuffer_node_t* buffer_node, sensor_data_t* data,READ_TH_ENUM thread){
     // recursive function to read the buffer based on the thread type
-    if(buffer_node == NULL) return SBUFFER_FAILURE;
+    if(buffer_node == NULL) return SBUFFER_NO_DATA;
     if(buffer_node->reader_threads[thread] == READ) 
         return sbuffer_read(buffer_node->next, data, thread);
     
@@ -150,6 +152,7 @@ int sbuffer_insert(sbuffer_t* buffer, sensor_data_t* data){
     return SBUFFER_SUCCESS;
 }
 
+#ifdef DEBUG
 void sbuffer_print_tree(sbuffer_node_t* node){
     if(node == NULL) return;
 
@@ -182,4 +185,4 @@ void sbuffer_print_tree(sbuffer_node_t* node){
 
     sbuffer_print_tree(node->next);
 }
-
+#endif

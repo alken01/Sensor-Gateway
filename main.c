@@ -21,7 +21,7 @@
 #include "lib/tcpsock.h"
 #include "lib/dplist.h"
 
-
+#define MAIN_PROCESS_THREAD_NR 3
 // functions
 void* connmgr_th(void* arg);
 void* datamgr_th(void* arg);
@@ -29,7 +29,7 @@ void* sensor_db_th(void* arg);
 
 int print_help();
 
-// variables
+// thread variables
 pthread_cond_t data_cond;
 pthread_mutex_t datamgr_lock;
 int* data_mgr;
@@ -122,15 +122,26 @@ int main(int argc, char* argv[]){
 #endif
 
     // create three threads
-    pthread_t threads[3];
+
+    pthread_t threads[MAIN_PROCESS_THREAD_NR];
     READ_TH_ENUM DMT = DATAMGR_THREAD;
     READ_TH_ENUM DBT = DB_THREAD;
     pthread_create(&threads[0], NULL, &connmgr_th, &port_number);
-    pthread_create(&threads[1], NULL, &datamgr_th, &DMT);
-    pthread_create(&threads[2], NULL, &sensor_db_th, &DBT);
+#ifdef DEBUG
+    printf("INITIALIZED CONNMGR THREAD\n");
+#endif
+    pthread_create(&threads[1], NULL, &sensor_db_th, &DBT);
+#ifdef DEBUG
+    printf("INITIALIZED DB THREAD\n");
+#endif
+    pthread_create(&threads[2], NULL, &datamgr_th, &DMT);
+#ifdef DEBUG
+    printf("INITIALIZED DATAMGR THREAD\n");
+#endif
+
 
     // join all the threads
-    for(int i = 0; i < 3; i++)
+    for(int i = 0; i < MAIN_PROCESS_THREAD_NR; i++)
         pthread_join(threads[i], NULL);
 
 #ifdef DEBUG
@@ -160,79 +171,65 @@ int main(int argc, char* argv[]){
     return 0;
 }
 
+void main_init_thread(config_thread_t* config_thread){
+    config_thread->data_cond = &data_cond;
+    config_thread->datamgr_lock = &datamgr_lock;
+    config_thread->data_mgr = data_mgr;
+    
+    config_thread->db_cond = &db_cond;
+    config_thread->db_lock = &db_lock;
+    config_thread->data_sensor_db = data_sensor_db;
+
+    config_thread->connmgr_lock = &connmgr_lock;
+    config_thread->connmgr_working = connmgr_working;
+
+    config_thread->fifo_mutex = &fifo_mutex;
+    config_thread->fifo_fd = fifo_fd;
+}
 
 void* connmgr_th(void* arg){
     int port_number = *((int*) arg);
-    config_thread_t connmgr_config_thread = {
-        .data_cond = &data_cond,
-        .datamgr_lock = &datamgr_lock,
-        .data_mgr = data_mgr,
-        
-        .db_cond = &db_cond,
-        .db_lock = &db_lock,
-        .data_sensor_db = data_sensor_db,
-
-        .connmgr_lock = &connmgr_lock,
-        .connmgr_working = connmgr_working,
-
-        .fifo_mutex = &fifo_mutex,
-        .fifo_fd = fifo_fd
-    };
+    config_thread_t connmgr_config_thread;
+    main_init_thread(&connmgr_config_thread);
 
     connmgr_init(&connmgr_config_thread);
     connmgr_listen(port_number, &buffer);
     connmgr_free();
-    return (void*) 0;
+#ifdef DEBUG
+    printf(RED_CLR"CLOSING CONNMGR_THR\n"OFF_CLR);
+#endif
+    return NULL;
 }
 
 void* datamgr_th(void* arg){
     FILE* fp_sensor_map = fopen("room_sensor.map", "r");
-    config_thread_t datamgr_config_thread =  {
-         .data_cond = &data_cond,
-        .datamgr_lock = &datamgr_lock,
-        .data_mgr = data_mgr,
-        
-        .db_cond = &db_cond,
-        .db_lock = &db_lock,
-        .data_sensor_db = data_sensor_db,
-
-        .connmgr_lock = &connmgr_lock,
-        .connmgr_working = connmgr_working,
-
-        .fifo_mutex = &fifo_mutex,
-        .fifo_fd = fifo_fd
-    };
+    config_thread_t datamgr_config_thread;
+    main_init_thread(&datamgr_config_thread);
 
     datamgr_init(&datamgr_config_thread);
     datamgr_parse_sensor_files(fp_sensor_map, &buffer);
     datamgr_free();
     fclose(fp_sensor_map);
-    return 0;
+    
+#ifdef DEBUG
+    printf(RED_CLR"CLOSING DATAMGR_THR\n"OFF_CLR);
+#endif
+    return NULL;
 }
 
 void* sensor_db_th(void* arg){
     // initialize the variables for the sensor_db thread
-    config_thread_t sensor_db_config_thread =  {
-        .data_cond = &data_cond,
-        .datamgr_lock = &datamgr_lock,
-        .data_mgr = data_mgr,
-        
-        .db_cond = &db_cond,
-        .db_lock = &db_lock,
-        .data_sensor_db = data_sensor_db,
+    config_thread_t sensor_db_config_thread;
+    main_init_thread(&sensor_db_config_thread);
 
-        .connmgr_lock = &connmgr_lock,
-        .connmgr_working = connmgr_working,
-
-        .fifo_mutex = &fifo_mutex,
-        .fifo_fd = fifo_fd
-    };
-    
     sensor_db_init(&sensor_db_config_thread);
     DBCONN* conn = init_connection(1);
     sensor_db_listen(conn, &buffer);
     disconnect(conn);
-    return 0;
+#ifdef DEBUG
+    printf(RED_CLR"CLOSING DB_THR\n"OFF_CLR);
+#endif
+    return NULL;
 }
 
 int print_help(){
