@@ -13,6 +13,9 @@
 #include "connmgr.h"
 #include "config.h"
 #include "sbuffer.h"
+#include <fcntl.h>
+#include <unistd.h>
+#include <pthread.h>
 
 typedef struct pollfd pollfd_t;
 
@@ -52,6 +55,7 @@ static pthread_rwlock_t* connmgr_lock;
 static bool* connmgr_working;
 
 static pthread_mutex_t* fifo_mutex;
+static pthread_mutex_t* log_mutex;
 static int* fifo_fd;
 
 void connmgr_init(config_thread_t* config_thread){
@@ -68,6 +72,7 @@ void connmgr_init(config_thread_t* config_thread){
 
 	fifo_fd = config_thread->fifo_fd;
 	fifo_mutex = config_thread->fifo_mutex;
+	log_mutex  = config_thread->log_mutex;
 }
 
 
@@ -324,6 +329,6 @@ int element_compare(void* x, void* y){
 static void log_event(char* log_event, int sensor_id){
 	// open gateway in append mode
 	FILE* fp_log = fopen("gateway.log", "a");
-	fprintf(fp_log, "\nSEQ_NR: xxx  TIME: %ld\n%s %d\n", time(NULL), log_event, sensor_id);
+	fprintf(fp_log, "\nSEQ_NR: 2  TIME: %ld\n%s %d\n", time(NULL), log_event, sensor_id);
 	fclose(fp_log);
 }

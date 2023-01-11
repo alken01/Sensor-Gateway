@@ -27,6 +27,8 @@
 #define WHITE_CLR   "\033[0;37m"
 #endif
 
+#define FIFO_NAME "logFifo"
+#define LOG_FILE "gateway.log"
 
 #ifndef RUN_AVG_LENGTH
 #define RUN_AVG_LENGTH 5
@@ -82,6 +84,8 @@ typedef struct {
 
     pthread_mutex_t* fifo_mutex;
     int* fifo_fd;
+
+    pthread_mutex_t* log_mutex;
 } config_thread_t;
 
 #endif /* _CONFIG_H_ */

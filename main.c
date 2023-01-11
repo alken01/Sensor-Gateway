@@ -45,7 +45,11 @@ pthread_rwlock_t connmgr_lock;
 bool* connmgr_working;
 
 pthread_mutex_t fifo_mutex;
-int* fifo_fd;
+
+pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;
+int* fifo_fd = 0;
+int log_sequence_number = 0;
+
 
 sbuffer_t* buffer;
 
@@ -57,41 +61,61 @@ int main(int argc, char* argv[]){
     int port_number = atoi(argv[1]);
 
     // fork into two processes
-    int pid = fork();
-    if(pid == -1) return -1;
+    // int pid = 1;
+    // if(pid == -1) return -1;
 
-    // // make a FIFO special file 
-    // if(mkfifo("log.FIFO", 0777) == -1){
-    //     if(errno != EEXIST){
-    //         printf("Could not create fifo file\n");
-    //         return -1;
-    //      }
+    // // Create the FIFO if it doesn't already exist
+    // if (mkfifo(FIFO_NAME, 0660) < 0) {
+    //     if (errno != EEXIST) {
+    //         perror("Could not create log FIFO");
+    //         exit(1);
+    //     }
     // }
 
-    // // initialize fifo file descriptor
-    // // TODO: chekck if putting this lower in the program works
-    // int* fifo_fd;
-
-    // // // the child handles the log process
+    // // the child handles the log process
     // if(pid == 0){
-    // //     //open the log file
-    //     FILE* gateway_log = fopen("gateway.log", "w");
+    //     int log_fifo;
 
-    // //     //open the log FIFO
+    //     // Open the FIFO for reading
+    //     log_fifo = open(FIFO_NAME, O_RDONLY);
+    //     if(log_fifo < 0){
+    //         perror("Could not open log FIFO");
+    //         exit(1);
+    //     }
 
-    // //     //read from fifo
-    // //     //TODO: CHANGE THIS
-    // //     // while(read(fifo_fd, &str_recv, MAX_BUFFER_SIZE) > 0){
-    // //     //     fprintf(gateway_log, "%s", str_recv);
-    // //     //     printf("wrote on file %s \n", str_recv);
-    // //     // }
-    //     fclose(gateway_log);
+    //     while(1){
+    //         char log_event_info[256];
+    //         int bytes_read;
+
+    //         // Read a log event from the FIFO
+    //         bytes_read = read(log_fifo, log_event_info, sizeof(log_event_info));
+    //         if(bytes_read < 0){
+    //             perror("Error reading from log FIFO");
+    //             exit(1);
+    //         } else if(bytes_read == 0){
+    //             // End of file
+    //             break;
+    //         }
+
+    //         // Write the log event to the log file
+    //         pthread_mutex_lock(&log_mutex);
+    //         FILE* log_file = fopen(LOG_FILE, "a");
+    //         if(log_file == NULL){
+    //             perror("Could not open log file");
+    //             exit(1);
+    //         }
+    //         time_t now;
+    //         time(&now);
+    //         fprintf(log_file, "%d %s %s\n", log_sequence_number++, ctime(&now), log_event_info);
+    //         fclose(log_file);
+    //         printf("LOGGED");
+    //         pthread_mutex_unlock(&log_mutex);
+    //     }
+
+    //     close(log_fifo);
     //     exit(EXIT_SUCCESS);
     // }
-
-    // fifo_fd = malloc(sizeof(int));
-    // *fifo_fd = open("log.FIFO", O_WRONLY);
-
+    
 #ifdef DEBUG
     printf("INITIALIZING SENSOR GATEWAY\n");
 #endif
@@ -155,8 +179,8 @@ int main(int argc, char* argv[]){
     free(data_mgr);
     free(data_sensor_db);
     free(connmgr_working);
-    // close(*fifo_fd);
-    // free(fifo_fd);
+
+
     sbuffer_free(&buffer);
 
 #ifdef DEBUG
@@ -179,6 +203,7 @@ void main_init_thread(config_thread_t* config_thread){
 
     config_thread->fifo_mutex = &fifo_mutex;
     config_thread->fifo_fd = fifo_fd;
+    config_thread->log_mutex = &log_mutex;
 }
 
 void* connmgr_th(void* arg){
