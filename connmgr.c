@@ -33,8 +33,7 @@ static void log_event(char* log_event, int sensor_id);
 int connmgr_add_sensor(poll_info_t** poll_at_index, int* list_size);
 int connmgr_add_sensor_data(sbuffer_t** buffer, poll_info_t** poll_at_index, sensor_data_t* sensor_data);
 void connmgr_remove_sensor(int* list_size, int index, poll_info_t** poll_at_index, poll_info_t* poll_server);
-
-void connmgr_notify_threads();
+void connmgr_close_connection(int port_number, poll_info_t** poll_at_index, poll_info_t* poll_server, FILE* fp_sensor_data_text);
 void connmgr_update_threads();
 void connmgr_close_threads();
 
@@ -117,58 +116,47 @@ void connmgr_listen(int port_number, sbuffer_t** buffer){
 		short poll_events = poll_at_index->file_d.revents;
 		long timeout_ts = time(NULL) - TIMEOUT;
 
-		// check if new connection
-		if(poll_nr > 0 && poll_events == POLLIN){
-			// in the first index we will only get notified about new connections 
-			if(index == 0){
-				if(connmgr_add_sensor(&poll_at_index, &list_size)!= TCP_NO_ERROR){
-					continue;
-				}
-#ifdef DEBUG
-				printf(PURPLE_CLR "CONNMGR: NEW CONNECTION.\n" OFF_CLR);
-#endif
-			} else{ // if not 0, then we have sensor data to read
-				// save the data in the sensor_data
-				sensor_data_t sensor_data;
+		// in index == 0 we get notified about new connections 
+		if(poll_nr > 0 && poll_events == POLLIN && index == 0)
+			if(connmgr_add_sensor(&poll_at_index, &list_size) != TCP_NO_ERROR) continue;
 
-				// add it in the buffer
-				if(connmgr_add_sensor_data(buffer, &(poll_at_index), &sensor_data) != TCP_NO_ERROR){
-					// if error remove the sensor
-					connmgr_remove_sensor(&list_size, index, &poll_at_index, &poll_server);
-					continue;
-				}
+		// in index > 0 we get notified about new sensor data
+		if(poll_nr > 0 && poll_events == POLLIN && index > 0){
+			// save the data in the sensor_data
+			sensor_data_t sensor_data;
 
-				// update the datamgr and db threads
-				connmgr_update_threads();
-
-				// print it in the text file
-				fprintf(fp_sensor_data_text, "ID: %u   VAL: %f   TIME: %ld\n", 
-						sensor_data.id, sensor_data.value, sensor_data.ts);
-#ifdef DEBUG
-				printf(PURPLE_CLR "CONNMGR: ID: %u   VAL: %f   TIME: %ld\n"OFF_CLR, 
-						sensor_data.id, sensor_data.value, sensor_data.ts);
-#endif
+			// add it in the buffer
+			if(connmgr_add_sensor_data(buffer, &(poll_at_index), &sensor_data) != TCP_NO_ERROR){
+				// if error remove the sensor
+				connmgr_remove_sensor(&list_size, index, &poll_at_index, &poll_server);
+				continue;
 			}
-		}
 
+			// update the datamgr and db threads
+			connmgr_update_threads();
+
+			// print it in the text file
+			fprintf(fp_sensor_data_text, "ID: %u   VAL: %f   TIME: %ld\n",
+				sensor_data.id, sensor_data.value, sensor_data.ts);
+#ifdef DEBUG
+			printf(PURPLE_CLR "CONNMGR: ID: %u   VAL: %f   TIME: %ld\n"OFF_CLR,
+				sensor_data.id, sensor_data.value, sensor_data.ts);
+#endif
+		}
 
 		// REMOVE THE SENSOR IF:
 		// not sent data in TIMEOUT seconds || a POLLHUP signal
-		if((poll_at_index->last_modified < timeout_ts && index > 0) || poll_events == POLLHUP){
+		if((poll_at_index->last_modified < timeout_ts && index > 0) || poll_events == POLLHUP)
 			connmgr_remove_sensor(&list_size, index, &poll_at_index, &poll_server);
-		}
+		
 
 		// STOP THE CONNMGR IF:
 		// no sensors in the list && TIMEOUT seconds have passed
 		if(list_size == 1 && poll_server.last_modified < timeout_ts){
-			connmgr_close_threads();
-			tcp_close(&(poll_at_index->socket_id));
-			log_event("CLOSED CONNECTION MANAGER: ", port_number);
-			tcp_close(&(poll_server.socket_id));
-			fclose(fp_sensor_data_text);
-			connmgr_free();
+			connmgr_close_connection(port_number, &poll_at_index, &poll_server, fp_sensor_data_text);
 			break;
 		}
+
 		index++;
 	}
 #ifdef DEBUG
@@ -180,6 +168,16 @@ void connmgr_listen(int port_number, sbuffer_t** buffer){
 void connmgr_free(){
 	dpl_free(&dpl_connections, true);
 }
+
+void connmgr_close_connection(int port_number, poll_info_t** poll_at_index, poll_info_t* poll_server, FILE* fp_sensor_data_text){
+	connmgr_close_threads();
+	tcp_close(&((*poll_at_index)->socket_id));
+	log_event("CLOSED CONNECTION MANAGER: ", port_number);
+	tcp_close(&(poll_server->socket_id));
+	fclose(fp_sensor_data_text);
+	connmgr_free();
+}
+
 
 void connmgr_remove_sensor(int* list_size, int index, poll_info_t** poll_at_index, poll_info_t* poll_server){
 #ifdef DEBUG
@@ -272,9 +270,11 @@ void connmgr_update_threads(){
 	pthread_mutex_unlock(datamgr_lock);
 	pthread_mutex_unlock(db_lock);
 
-	// notify the threads
-	connmgr_notify_threads();
+	// let the other threads know there is data to read
+	pthread_cond_broadcast(db_cond);
+	pthread_cond_broadcast(data_cond);
 }
+
 void connmgr_close_threads(){
 	// close the connmgr
 	pthread_rwlock_wrlock(connmgr_lock);
@@ -293,10 +293,6 @@ void connmgr_close_threads(){
 	pthread_mutex_unlock(datamgr_lock);
 	pthread_mutex_unlock(db_lock);
 	
-	// notify the threads
-	connmgr_notify_threads();
-}
-void connmgr_notify_threads(){
 	// let the other threads know there is data to read
 	pthread_cond_broadcast(db_cond);
 	pthread_cond_broadcast(data_cond);

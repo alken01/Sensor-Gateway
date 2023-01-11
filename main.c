@@ -57,8 +57,8 @@ int main(int argc, char* argv[]){
     int port_number = atoi(argv[1]);
 
     // fork into two processes
-    // int pid = fork();
-    // if(pid == -1) return -1;
+    int pid = fork();
+    if(pid == -1) return -1;
 
     // // make a FIFO special file 
     // if(mkfifo("log.FIFO", 0777) == -1){

@@ -17,6 +17,7 @@
 
 void log_event(char* log_event);
 int sql_query(DBCONN* conn, callback_t f, char* sql);
+void sensor_close_threads();
 
 // global variables
 static pthread_cond_t* data_cond;
@@ -62,6 +63,7 @@ DBCONN* init_connection(char clear_up_flag){
 #ifdef DEBUG
         printf(BLUE_CLR "DB: CANNOT OPEN DATABASE.\n DB: UNABLE TO CONNECT TO SQL SERVER.\n" OFF_CLR);
 #endif
+        sensor_close_threads();
         return NULL;
     }
 
@@ -207,4 +209,27 @@ int sql_query(DBCONN* conn, callback_t f, char* sql){
 #endif
     sqlite3_free(sql);
     return 0;
+}
+
+void sensor_close_threads(){
+	// close the connmgr
+	pthread_rwlock_wrlock(connmgr_lock);
+	*connmgr_working = false;
+	pthread_rwlock_unlock(connmgr_lock);
+
+	// lock the mutex
+	pthread_mutex_lock(datamgr_lock);
+	pthread_mutex_lock(db_lock);
+
+	// update the number of data in the buffer
+	(*data_mgr) = -1;
+	(*data_sensor_db) = -1;
+
+	// unlock the mutex
+	pthread_mutex_unlock(datamgr_lock);
+	pthread_mutex_unlock(db_lock);
+	
+	// notify the threads
+	pthread_cond_broadcast(db_cond);
+	pthread_cond_broadcast(data_cond);
 }
