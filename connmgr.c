@@ -67,14 +67,13 @@ void connmgr_init(config_thread_t* config_thread){
 
 	fifo_fd = config_thread->fifo_fd;
 	fifo_mutex = config_thread->fifo_mutex;
-
-	*data_mgr = 0;
-	*data_sensor_db = 0;
-	*connmgr_working = true;
 }
 
 
 void connmgr_listen(int port_number, sbuffer_t** buffer){
+#ifdef DEBUG
+	printf(PURPLE_CLR "CONNMGR: NEW CONNMGR.\n" OFF_CLR);
+#endif
 	// create and initialize dpl_connections
 	dpl_connections = dpl_create(element_copy, element_free, element_compare);
 
@@ -103,24 +102,28 @@ void connmgr_listen(int port_number, sbuffer_t** buffer){
 
 	// get size of list
 	int list_size = dpl_size(dpl_connections);
+	int index = 0;
 	while(*connmgr_working){
+		// iterate through the list and check their polls
+		if(index == list_size) index = 0;
 		
-		// iterate through the list
-		for(int index = 0; index < list_size; index++){
+		// get the poll_info_t at the index
+		poll_info_t* poll_at_index = dpl_get_element_at_index(dpl_connections, index);
+		
+		// get the values
+		int poll_nr = poll(&(poll_at_index->file_d), 1, TIMEOUT);
+		short poll_events = poll_at_index->file_d.revents;
+		long timeout_ts = time(NULL) - TIMEOUT;
 
-			poll_info_t* poll_at_index = dpl_get_element_at_index(dpl_connections, index);
-
-			if(poll(&(poll_at_index->file_d), 1, 0) > 0 && poll_at_index->file_d.revents == POLLIN){
-				// in the first index we will only get notified about new connections 
-				if(index == 0){
-					connmgr_add_sensor(&poll_at_index, &list_size);
+		// check if new connection
+		if(poll_nr > 0 && poll_events == POLLIN){
+			// in the first index we will only get notified about new connections 
+			if(index == 0){
+				connmgr_add_sensor(&poll_at_index, &list_size);
 #ifdef DEBUG
-					printf(PURPLE_CLR "CONNMGR: NEW CONNECTION.\n" OFF_CLR);
+				printf(PURPLE_CLR "CONNMGR: NEW CONNECTION.\n" OFF_CLR);
 #endif
-					continue;
-				}
-				// if not 0, then we have data to read
-
+			} else{ // if not 0, then we have sensor data to read
 				// save the data in the sensor_data
 				sensor_data_t sensor_data;
 
@@ -136,35 +139,38 @@ void connmgr_listen(int port_number, sbuffer_t** buffer){
 				printf(PURPLE_CLR "CONNMGR: ID: %u   VAL: %f   TIME: %ld\n"OFF_CLR, sensor_data.id, sensor_data.value, sensor_data.ts);
 #endif
 			}
-
-			// REMOVE SENSOR IF:
-			// not sent data in TIMEOUT seconds || a POLLHUP signal
-			if(((poll_at_index->last_modified + TIMEOUT) < time(NULL) && index > 0) || poll_at_index->file_d.revents == POLLHUP){
-#ifdef DEBUG
-				printf(PURPLE_CLR "CLOSED CONNECTION SENSOR ID:%d\n"OFF_CLR, poll_at_index->sensor_id);
-#endif
-				// remove the sensor
-				log_event("CLOSED CONNECTION SENSOR ID:", poll_at_index->sensor_id);
-				tcp_close(&(poll_at_index->socket_id));
-				dpl_connections = dpl_remove_at_index(dpl_connections, index, true);
-				list_size--; // decrement the list size
-
-				// update the last modified time of the poll_server
-				poll_server.last_modified = time(NULL);
-			}
-
-			// STOP THE CONNMGR IF:
-			// no sensors in the list && TIMEOUT seconds have passed
-			if(list_size == 1 && (poll_server.last_modified + TIMEOUT) < time(NULL)){
-				connmgr_close_threads();
-				tcp_close(&(poll_at_index->socket_id));
-				log_event("CLOSED CONNECTION MANAGER: ", port_number);
-				tcp_close(&(poll_server.socket_id));
-				fclose(fp_sensor_data_text);
-				break;
-			}
 		}
-	} 
+
+
+		// REMOVE SENSOR IF:
+		// not sent data in TIMEOUT seconds || a POLLHUP signal
+		if((poll_at_index->last_modified < timeout_ts && index > 0) || poll_events == POLLHUP){
+#ifdef DEBUG
+			printf(PURPLE_CLR "CLOSED CONNECTION SENSOR ID: %d\n"OFF_CLR, poll_at_index->sensor_id);
+#endif
+			// remove the sensor
+			log_event("CLOSED CONNECTION SENSOR ID:", poll_at_index->sensor_id);
+			tcp_close(&(poll_at_index->socket_id));
+			dpl_connections = dpl_remove_at_index(dpl_connections, index, true);
+			list_size--; // decrement the list size
+
+			// update the last modified time of the poll_server
+			poll_server.last_modified = time(NULL);
+		}
+
+		// STOP THE CONNMGR IF:
+		// no sensors in the list && TIMEOUT seconds have passed
+		if(list_size == 1 && poll_server.last_modified < timeout_ts){
+			connmgr_close_threads();
+			tcp_close(&(poll_at_index->socket_id));
+			log_event("CLOSED CONNECTION MANAGER: ", port_number);
+			tcp_close(&(poll_server.socket_id));
+			fclose(fp_sensor_data_text);
+			connmgr_free();
+			break;
+		}
+		index++;
+	}
 #ifdef DEBUG
 	printf(PURPLE_CLR "CLOSING CONNMGR.\n" OFF_CLR);
 #endif
@@ -177,16 +183,17 @@ void connmgr_free(){
 
 void connmgr_add_sensor(poll_info_t** poll_at_index, int* list_size){
 	tcpsock_t* new_socket;
-	if(tcp_wait_for_connection((*poll_at_index)->socket_id, &new_socket) != TCP_NO_ERROR) exit(EXIT_FAILURE);
+	if(tcp_wait_for_connection((*poll_at_index)->socket_id, &new_socket) != TCP_NO_ERROR) printf(PURPLE_CLR "ERROR WAITING TCP CONNECTION.\n" OFF_CLR), exit(EXIT_FAILURE);
 
 	pollfd_t new_fd;
-	if(tcp_get_sd(new_socket, &(new_fd.fd)) != TCP_NO_ERROR) exit(EXIT_FAILURE);
+	if(tcp_get_sd(new_socket, &(new_fd.fd)) != TCP_NO_ERROR) 
+	printf(PURPLE_CLR "ERROR GETTING TCP SD.\n" OFF_CLR), exit(EXIT_FAILURE);
 
 	// initialise the sensor
 	poll_info_t insert_sensor = {
-						.last_modified = time(NULL),
-						.socket_id = new_socket,
-						.file_d = new_fd
+		.last_modified = time(NULL),
+		.socket_id = new_socket,
+		.file_d = new_fd
 	};
 
 	//also listen if the sensor quits
@@ -205,9 +212,9 @@ void connmgr_add_sensor_data(sbuffer_t** buffer, poll_info_t** poll_at_index, se
 	int stt = (int) sizeof(sensor_ts_t);
 
 	//receive the data
-	if(tcp_receive((*poll_at_index)->socket_id, &(sensor_data->id), &sit) != TCP_NO_ERROR) exit(EXIT_FAILURE);
-	if(tcp_receive((*poll_at_index)->socket_id, &(sensor_data->value), &sdt) != TCP_NO_ERROR) exit(EXIT_FAILURE);
-	if(tcp_receive((*poll_at_index)->socket_id, &(sensor_data->ts), &stt) != TCP_NO_ERROR) exit(EXIT_FAILURE);
+	if(tcp_receive((*poll_at_index)->socket_id, &(sensor_data->id), &sit) != TCP_NO_ERROR) printf(PURPLE_CLR "ERROR RECEIVING TCP DATA.\n" OFF_CLR), exit(EXIT_FAILURE);
+	tcp_receive((*poll_at_index)->socket_id, &(sensor_data->value), &sdt);
+	tcp_receive((*poll_at_index)->socket_id, &(sensor_data->ts), &stt);
 
 #ifdef DEBUG
 	printf(PURPLE_CLR "CONNMGR: NEW DATA RECEIVED.\n" OFF_CLR);
@@ -227,6 +234,7 @@ void connmgr_add_sensor_data(sbuffer_t** buffer, poll_info_t** poll_at_index, se
 	(*poll_at_index)->last_modified = sensor_data->ts;
 	int res = sbuffer_insert(*buffer, sensor_data);
 #ifdef DEBUG
+	if(res != SBUFFER_SUCCESS)
 		printf(PURPLE_CLR "CONNMGR: SBUFFER ERROR: %d\n"OFF_CLR, res);
 #endif
 }

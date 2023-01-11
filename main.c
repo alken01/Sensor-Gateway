@@ -50,7 +50,6 @@ int* fifo_fd;
 sbuffer_t* buffer;
 
 int main(int argc, char* argv[]){
-    printf("start");
     // check if port_number arguments passed
     if(argv[1] == NULL) return print_help();
 
@@ -58,37 +57,37 @@ int main(int argc, char* argv[]){
     int port_number = atoi(argv[1]);
 
     // fork into two processes
-    int pid = fork();
-    if(pid == -1) return -1;
+    // int pid = fork();
+    // if(pid == -1) return -1;
 
-    // make a FIFO special file 
-    if(mkfifo("log.FIFO", 0777) == -1){
-        if(errno != EEXIST){
-            printf("Could not create fifo file\n");
-            return -1;
-         }
-    }
+    // // make a FIFO special file 
+    // if(mkfifo("log.FIFO", 0777) == -1){
+    //     if(errno != EEXIST){
+    //         printf("Could not create fifo file\n");
+    //         return -1;
+    //      }
+    // }
 
-    // initialize fifo file descriptor
-    // TODO: chekck if putting this lower in the program works
-    int* fifo_fd;
+    // // initialize fifo file descriptor
+    // // TODO: chekck if putting this lower in the program works
+    // int* fifo_fd;
 
-    // // the child handles the log process
-    if(pid == 0){
-    //     //open the log file
-        FILE* gateway_log = fopen("gateway.log", "w");
+    // // // the child handles the log process
+    // if(pid == 0){
+    // //     //open the log file
+    //     FILE* gateway_log = fopen("gateway.log", "w");
 
-    //     //open the log FIFO
+    // //     //open the log FIFO
 
-    //     //read from fifo
-    //     //TODO: CHANGE THIS
-    //     // while(read(fifo_fd, &str_recv, MAX_BUFFER_SIZE) > 0){
-    //     //     fprintf(gateway_log, "%s", str_recv);
-    //     //     printf("wrote on file %s \n", str_recv);
-    //     // }
-        fclose(gateway_log);
-        exit(EXIT_SUCCESS);
-    }
+    // //     //read from fifo
+    // //     //TODO: CHANGE THIS
+    // //     // while(read(fifo_fd, &str_recv, MAX_BUFFER_SIZE) > 0){
+    // //     //     fprintf(gateway_log, "%s", str_recv);
+    // //     //     printf("wrote on file %s \n", str_recv);
+    // //     // }
+    //     fclose(gateway_log);
+    //     exit(EXIT_SUCCESS);
+    // }
 
     // fifo_fd = malloc(sizeof(int));
     // *fifo_fd = open("log.FIFO", O_WRONLY);
@@ -101,7 +100,7 @@ int main(int argc, char* argv[]){
     data_mgr = malloc(sizeof(int));
     data_sensor_db = malloc(sizeof(int));
     connmgr_working = malloc(sizeof(bool));
-    fifo_fd = malloc(sizeof(int));
+    // fifo_fd = malloc(sizeof(int));
 
     *data_mgr = 0;
 	*data_sensor_db = 0;
@@ -141,7 +140,8 @@ int main(int argc, char* argv[]){
 #ifdef DEBUG
     printf("JOINED THREADS\n");
 #endif
-    // free and destroy everything
+
+    // destroy the threads
     pthread_cond_destroy(&data_cond);
     pthread_mutex_destroy(&datamgr_lock);
     
@@ -151,11 +151,12 @@ int main(int argc, char* argv[]){
     pthread_rwlock_destroy(&connmgr_lock);    
     pthread_mutex_destroy(&fifo_mutex);
 
+    // free the threads
     free(data_mgr);
     free(data_sensor_db);
     free(connmgr_working);
-    close(*fifo_fd);
-    free(fifo_fd);
+    // close(*fifo_fd);
+    // free(fifo_fd);
     sbuffer_free(&buffer);
 
 #ifdef DEBUG
@@ -187,7 +188,6 @@ void* connmgr_th(void* arg){
 
     connmgr_init(&connmgr_config_thread);
     connmgr_listen(port_number, &buffer);
-    connmgr_free();
 
 #ifdef DEBUG
     printf(RED_CLR"CLOSING CONNMGR_THR\n"OFF_CLR);

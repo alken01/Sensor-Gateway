@@ -1,6 +1,6 @@
 TITLE_COLOR = \033[33m
 NO_COLOR = \033[0m
-
+TIMEOUT = 4
 # when executing make, compile all exe's
 all: sensor_gateway sensor_node file_creator
 
@@ -10,11 +10,11 @@ sensor_gateway : main.c connmgr.c datamgr.c sensor_db.c sbuffer.c lib/libdplist.
 	@echo "$(TITLE_COLOR)\n***** CPPCHECK *****$(NO_COLOR)"
 	cppcheck --enable=all --suppress=missingIncludeSystem main.c connmgr.c datamgr.c sensor_db.c sbuffer.c
 	@echo "$(TITLE_COLOR)\n***** COMPILING sensor_gateway *****$(NO_COLOR)"
-	gcc -c main.c      -Wall -std=c11 -Werror -DSET_MIN_TEMP=10 -DSET_MAX_TEMP=20 -DTIMEOUT=5 -o main.o      -fdiagnostics-color=auto -DDEBUG
-	gcc -c connmgr.c   -Wall -std=c11 -Werror -DSET_MIN_TEMP=10 -DSET_MAX_TEMP=20 -DTIMEOUT=5 -o connmgr.o   -fdiagnostics-color=auto -DDEBUG
-	gcc -c datamgr.c   -Wall -std=c11 -Werror -DSET_MIN_TEMP=10 -DSET_MAX_TEMP=20 -DTIMEOUT=5 -o datamgr.o   -fdiagnostics-color=auto -DDEBUG
-	gcc -c sensor_db.c -Wall -std=c11 -Werror -DSET_MIN_TEMP=10 -DSET_MAX_TEMP=20 -DTIMEOUT=5 -o sensor_db.o -fdiagnostics-color=auto -DDEBUG
-	gcc -c sbuffer.c   -Wall -std=c11 -Werror -DSET_MIN_TEMP=10 -DSET_MAX_TEMP=20 -DTIMEOUT=5 -o sbuffer.o   -fdiagnostics-color=auto -DDEBUG
+	gcc -c main.c      -Wall -std=c11 -Werror -DSET_MIN_TEMP=10 -DSET_MAX_TEMP=20 -DTIMEOUT=$(TIMEOUT) -o main.o      -fdiagnostics-color=auto -DDEBUG
+	gcc -c connmgr.c   -Wall -std=c11 -Werror -DSET_MIN_TEMP=10 -DSET_MAX_TEMP=20 -DTIMEOUT=$(TIMEOUT) -o connmgr.o   -fdiagnostics-color=auto -DDEBUG
+	gcc -c datamgr.c   -Wall -std=c11 -Werror -DSET_MIN_TEMP=10 -DSET_MAX_TEMP=20 -DTIMEOUT=$(TIMEOUT) -o datamgr.o   -fdiagnostics-color=auto -DDEBUG
+	gcc -c sensor_db.c -Wall -std=c11 -Werror -DSET_MIN_TEMP=10 -DSET_MAX_TEMP=20 -DTIMEOUT=$(TIMEOUT) -o sensor_db.o -fdiagnostics-color=auto -DDEBUG
+	gcc -c sbuffer.c   -Wall -std=c11 -Werror -DSET_MIN_TEMP=10 -DSET_MAX_TEMP=20 -DTIMEOUT=$(TIMEOUT) -o sbuffer.o   -fdiagnostics-color=auto -DDEBUG
 	@echo "$(TITLE_COLOR)\n***** LINKING sensor_gateway *****$(NO_COLOR)"
 	gcc main.o connmgr.o datamgr.o sensor_db.o sbuffer.o -ldplist -ltcpsock -lpthread -o sensor_gateway -Wall -L./lib -Wl,-rpath,./lib -lsqlite3 -fdiagnostics-color=auto
 
@@ -24,7 +24,7 @@ file_creator : file_creator.c
 
 sensor_node : sensor_node.c lib/libtcpsock.so
 	@echo "$(TITLE_COLOR)\n***** COMPILING sensor_node *****$(NO_COLOR)"
-	gcc -c sensor_node.c -Wall -std=c11 -Werror -o sensor_node.o -fdiagnostics-color=auto
+	gcc -c sensor_node.c -DLOOPS=2 -Wall -std=c11 -Werror -o sensor_node.o -fdiagnostics-color=auto
 	@echo "$(TITLE_COLOR)\n***** LINKING sensor_node *****$(NO_COLOR)"
 	gcc sensor_node.o -ltcpsock -o sensor_node -Wall -L./lib -Wl,-rpath,./lib -fdiagnostics-color=auto
 
@@ -54,11 +54,11 @@ clean-all: clean
 	rm -rf lib/*.so
 
 run : sensor_gateway sensor_node
-	valgrind --leak-check=full -s --show-leak-kinds=all ./sensor_gateway 3756
+	valgrind --leak-check=full -s --show-leak-kinds=all --track-origins=yes --leak-check-heuristics=all ./sensor_gateway 3756
 #	./sensor_gateway 3756
 
 node : sensor_node 
-	./sensor_node 15 3 127.0.0.1 3756 
+	valgrind --leak-check=full -s --show-leak-kinds=all --track-origins=yes --leak-check-heuristics=all ./sensor_node 15 3 127.0.0.1 3756 
 
 node2 : sensor_node 
 	./sensor_node 21 3 127.0.0.1 3756 
