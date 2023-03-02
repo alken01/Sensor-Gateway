@@ -72,7 +72,7 @@ void connmgr_init(config_thread_t* config_thread){
 
 	fifo_fd = config_thread->fifo_fd;
 	fifo_mutex = config_thread->fifo_mutex;
-	log_mutex  = config_thread->log_mutex;
+	log_mutex = config_thread->log_mutex;
 }
 
 
@@ -112,10 +112,10 @@ void connmgr_listen(int port_number, sbuffer_t** buffer){
 	while(*connmgr_working){
 		// iterate through the list and check their polls
 		if(index == list_size) index = 0;
-		
+
 		// get the poll_info_t at the index
 		poll_info_t* poll_at_index = dpl_get_element_at_index(dpl_connections, index);
-		
+
 		// get the values
 		int poll_nr = poll(&(poll_at_index->file_d), 1, TIMEOUT);
 		short poll_events = poll_at_index->file_d.revents;
@@ -153,7 +153,7 @@ void connmgr_listen(int port_number, sbuffer_t** buffer){
 		// not sent data in TIMEOUT seconds || a POLLHUP signal
 		if((poll_at_index->last_modified < timeout_ts && index > 0) || poll_events == POLLHUP)
 			connmgr_remove_sensor(&list_size, index, &poll_at_index, &poll_server);
-		
+
 
 		// STOP THE CONNMGR IF:
 		// no sensors in the list && TIMEOUT seconds have passed
@@ -200,13 +200,17 @@ void connmgr_remove_sensor(int* list_size, int index, poll_info_t** poll_at_inde
 int connmgr_add_sensor(poll_info_t** poll_at_index, int* list_size){
 	tcpsock_t* new_socket;
 	if(tcp_wait_for_connection((*poll_at_index)->socket_id, &new_socket) != TCP_NO_ERROR){
+#ifdef DEBUG
 		printf(PURPLE_CLR "ERROR WAITING TCP CONNECTION.\n" OFF_CLR);
+#endif
 		return TCP_CONNECTION_CLOSED;
 	}
 
 	pollfd_t new_fd;
-	if(tcp_get_sd(new_socket, &(new_fd.fd)) != TCP_NO_ERROR) {
+	if(tcp_get_sd(new_socket, &(new_fd.fd)) != TCP_NO_ERROR){
+#ifdef DEBUG
 		printf(PURPLE_CLR "ERROR GETTING TCP SD.\n" OFF_CLR);
+#endif
 		return TCP_SOCKET_ERROR;
 	}
 
@@ -235,7 +239,9 @@ int connmgr_add_sensor_data(sbuffer_t** buffer, poll_info_t** poll_at_index, sen
 
 	//receive the data
 	if(tcp_receive((*poll_at_index)->socket_id, &(sensor_data->id), &sit) != TCP_NO_ERROR){
+#ifdef DEBUG
 		printf(PURPLE_CLR "ERROR RECEIVING TCP DATA.\n" OFF_CLR);
+#endif
 		return TCP_SOCKET_ERROR;
 	}
 	tcp_receive((*poll_at_index)->socket_id, &(sensor_data->value), &sdt);
@@ -257,7 +263,7 @@ int connmgr_add_sensor_data(sbuffer_t** buffer, poll_info_t** poll_at_index, sen
 
 	//update the poll_at_index time
 	(*poll_at_index)->last_modified = sensor_data->ts;
-	
+
 	if(sbuffer_insert(*buffer, sensor_data) != SBUFFER_SUCCESS)
 		printf("CONNMGR: SBUFFER ERROR\n");
 	return TCP_NO_ERROR;
@@ -297,7 +303,7 @@ void connmgr_close_threads(){
 	// unlock the mutex
 	pthread_mutex_unlock(datamgr_lock);
 	pthread_mutex_unlock(db_lock);
-	
+
 	// let the other threads know there is data to read
 	pthread_cond_broadcast(db_cond);
 	pthread_cond_broadcast(data_cond);
